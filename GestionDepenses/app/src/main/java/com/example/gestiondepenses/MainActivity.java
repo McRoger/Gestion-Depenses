@@ -310,7 +310,6 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
                             MainActivity.this.handler.post(new Runnable() {
                                 public void run() {
                                     progressBar.setVisibility(View.GONE);
-                                    Toast.makeText(MainActivity.this, "Les dépenses sélectionnées ont été importées dans l'appareil !", Toast.LENGTH_LONG).show();
                                 }
                             });
 
