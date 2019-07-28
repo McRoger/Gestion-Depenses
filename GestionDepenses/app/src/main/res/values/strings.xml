@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">Gestion des dépenses</string>
+    <string name="APP_KEY"><APP_KEY></string>
+    <string name="title_activity_login">LoginActivity</string>
+    <string name="sign_in">Sign in</string>
+    <string name="creer_depenses">Créer dépenses</string>
+
+
+</resources>
