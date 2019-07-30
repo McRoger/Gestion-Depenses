@@ -86,6 +86,7 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
     private HashMap<File, String> mapFileDrive = new HashMap<>();
 
     private Boolean accesInternet = true;
+    private Boolean isCliquable = true;
 
     private ProgressBar progressBar;
     private final android.os.Handler handler = new android.os.Handler();
@@ -173,7 +174,9 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
             creerDepense.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
+                    isCliquable=false;
                     createFile();
+                    isCliquable=true;
                 }
             });
 
@@ -183,6 +186,7 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
 
                     new Thread(new Runnable() {
                         public void run() {
+                            isCliquable=false;
 
                             MainActivity.this.handler.post(new Runnable() {
                                 public void run() {
@@ -193,6 +197,7 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
                             MainActivity.this.handler.post(new Runnable() {
                                 public void run() {
                                     progressBar.setVisibility(View.GONE);
+                                    isCliquable=true;
                                 }
                             });
 
@@ -212,6 +217,8 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
 
                             MainActivity.this.handler.post(new Runnable() {
                                 public void run() {
+                                    isCliquable=false;
+
                                     progressBar.setVisibility(View.VISIBLE);
                                 }
                             });
@@ -219,6 +226,7 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
                             MainActivity.this.handler.post(new Runnable() {
                                 public void run() {
                                     progressBar.setVisibility(View.GONE);
+                                    isCliquable=true;
                                     Toast.makeText(MainActivity.this, "Les dépenses sélectionnées ont été supprimées de l'appareil !", Toast.LENGTH_LONG).show();
                                 }
                             });
@@ -240,6 +248,8 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
 
                             MainActivity.this.handler.post(new Runnable() {
                                 public void run() {
+                                    isCliquable=false;
+
                                     progressBar.setVisibility(View.VISIBLE);
                                 }
                             });
@@ -247,6 +257,8 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
                             MainActivity.this.handler.post(new Runnable() {
                                 public void run() {
                                     progressBar.setVisibility(View.GONE);
+                                    isCliquable=true;
+
                                     Toast.makeText(MainActivity.this, "Les dépenses sélectionnées ont été importées dans l'appareil !", Toast.LENGTH_LONG).show();
                                 }
                             });
@@ -268,6 +280,8 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
 
                             MainActivity.this.handler.post(new Runnable() {
                                 public void run() {
+                                    isCliquable=false;
+
                                     progressBar.setVisibility(View.VISIBLE);
                                 }
                             });
@@ -275,6 +289,8 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
                             MainActivity.this.handler.post(new Runnable() {
                                 public void run() {
                                     progressBar.setVisibility(View.GONE);
+                                    isCliquable=true;
+
                                     Toast.makeText(MainActivity.this, "Les dépenses sélectionnées ont été supprimées du drive !", Toast.LENGTH_LONG).show();
                                 }
                             });
@@ -288,8 +304,9 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
             refreshListPhone.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
-
+                    isCliquable=false;
                     getFilesPhone();
+                    isCliquable=true;
                 }
             });
 
@@ -303,6 +320,7 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
 
                             MainActivity.this.handler.post(new Runnable() {
                                 public void run() {
+                                    isCliquable=false;
                                     progressBar.setVisibility(View.VISIBLE);
                                 }
                             });
@@ -310,6 +328,7 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
                             MainActivity.this.handler.post(new Runnable() {
                                 public void run() {
                                     progressBar.setVisibility(View.GONE);
+                                    isCliquable=true;
                                 }
                             });
 
@@ -840,33 +859,49 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
         }
 
         if (exportDepenses != null) {
-            exportDepenses.setEnabled(accesInternet && areItemsChecked(listFilePhone));
+            exportDepenses.setEnabled(accesInternet && areItemsChecked(listFilePhone) && isCliquable);
 
         }
 
         if (importDepenses != null) {
-            importDepenses.setEnabled(accesInternet && areItemsChecked(listFileDrive));
+            importDepenses.setEnabled(accesInternet && areItemsChecked(listFileDrive) && isCliquable);
 
         }
 
         if (supprimerDepensesDrive != null) {
-            supprimerDepensesDrive.setEnabled(accesInternet && areItemsChecked(listFileDrive));
+            supprimerDepensesDrive.setEnabled(accesInternet && areItemsChecked(listFileDrive) && isCliquable);
+
+        }
+
+        if (supprimerDepensesPhone != null) {
+            supprimerDepensesPhone.setEnabled(areItemsChecked(listFilePhone) && isCliquable);
 
         }
 
         if (listFileDrive != null) {
-            listFileDrive.setEnabled(accesInternet);
+            listFileDrive.setEnabled(accesInternet && isCliquable);
+
+        }
+
+        if (listFilePhone != null) {
+            listFilePhone.setEnabled(isCliquable);
 
         }
 
         if (refreshListDrive != null) {
-            refreshListDrive.setEnabled(accesInternet);
+            refreshListDrive.setEnabled(accesInternet && isCliquable);
 
         }
 
-        if (null != supprimerDepensesPhone) {
-            supprimerDepensesPhone.setEnabled(areItemsChecked(listFilePhone));
+        if (refreshListPhone != null) {
+            refreshListPhone.setEnabled(isCliquable);
+
         }
+
+        if (null != creerDepense) {
+            creerDepense.setEnabled(isCliquable);
+        }
+
         return accesInternet;
     }
 
