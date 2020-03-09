@@ -174,9 +174,9 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
             creerDepense.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
-                    isCliquable=false;
+                    isCliquable = false;
                     createFile();
-                    isCliquable=true;
+                    isCliquable = true;
                 }
             });
 
@@ -186,7 +186,7 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
 
                     new Thread(new Runnable() {
                         public void run() {
-                            isCliquable=false;
+                            isCliquable = false;
 
                             MainActivity.this.handler.post(new Runnable() {
                                 public void run() {
@@ -197,7 +197,7 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
                             MainActivity.this.handler.post(new Runnable() {
                                 public void run() {
                                     progressBar.setVisibility(View.GONE);
-                                    isCliquable=true;
+                                    isCliquable = true;
                                 }
                             });
 
@@ -212,21 +212,23 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
 
                 @Override
                 public void onClick(View v) {
-                    new Thread(new Runnable() {
+                 new Thread(new Runnable() {
                         public void run() {
 
                             MainActivity.this.handler.post(new Runnable() {
                                 public void run() {
-                                    isCliquable=false;
+                                    isCliquable = false;
 
                                     progressBar.setVisibility(View.VISIBLE);
                                 }
                             });
                             deletePhone();
+
                             MainActivity.this.handler.post(new Runnable() {
                                 public void run() {
                                     progressBar.setVisibility(View.GONE);
-                                    isCliquable=true;
+                                    isCliquable = true;
+                                    updateDataPhone();
                                     Toast.makeText(MainActivity.this, "Les dépenses sélectionnées ont été supprimées de l'appareil !", Toast.LENGTH_LONG).show();
                                 }
                             });
@@ -248,7 +250,7 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
 
                             MainActivity.this.handler.post(new Runnable() {
                                 public void run() {
-                                    isCliquable=false;
+                                    isCliquable = false;
 
                                     progressBar.setVisibility(View.VISIBLE);
                                 }
@@ -257,7 +259,7 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
                             MainActivity.this.handler.post(new Runnable() {
                                 public void run() {
                                     progressBar.setVisibility(View.GONE);
-                                    isCliquable=true;
+                                    isCliquable = true;
 
                                     Toast.makeText(MainActivity.this, "Les dépenses sélectionnées ont été importées dans l'appareil !", Toast.LENGTH_LONG).show();
                                 }
@@ -280,7 +282,7 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
 
                             MainActivity.this.handler.post(new Runnable() {
                                 public void run() {
-                                    isCliquable=false;
+                                    isCliquable = false;
 
                                     progressBar.setVisibility(View.VISIBLE);
                                 }
@@ -289,7 +291,7 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
                             MainActivity.this.handler.post(new Runnable() {
                                 public void run() {
                                     progressBar.setVisibility(View.GONE);
-                                    isCliquable=true;
+                                    isCliquable = true;
 
                                     Toast.makeText(MainActivity.this, "Les dépenses sélectionnées ont été supprimées du drive !", Toast.LENGTH_LONG).show();
                                 }
@@ -304,9 +306,9 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
             refreshListPhone.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
-                    isCliquable=false;
+                    isCliquable = false;
                     getFilesPhone();
-                    isCliquable=true;
+                    isCliquable = true;
                 }
             });
 
@@ -320,7 +322,7 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
 
                             MainActivity.this.handler.post(new Runnable() {
                                 public void run() {
-                                    isCliquable=false;
+                                    isCliquable = false;
                                     progressBar.setVisibility(View.VISIBLE);
                                 }
                             });
@@ -328,7 +330,7 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
                             MainActivity.this.handler.post(new Runnable() {
                                 public void run() {
                                     progressBar.setVisibility(View.GONE);
-                                    isCliquable=true;
+                                    isCliquable = true;
                                 }
                             });
 
@@ -387,10 +389,7 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
             for (File file : files) {
                 removeListPhone(file);
             }
-            updateDataPhone();
-
         }
-
 
     }
 
