@@ -1,12 +1,8 @@
 package com.example.gestiondepenses;
 
 
-import android.app.ProgressDialog;
-import android.content.Context;
 import android.os.AsyncTask;
 import android.util.Log;
-import android.view.View;
-import android.widget.ProgressBar;
 
 import com.dropbox.core.DbxException;
 import com.dropbox.core.v2.DbxClientV2;

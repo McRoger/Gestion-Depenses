@@ -2,7 +2,6 @@ package com.example.gestiondepenses;
 
 
 import android.Manifest;
-import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -12,7 +11,6 @@ import android.net.NetworkInfo;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
-import android.os.Handler;
 import android.util.Log;
 import android.util.SparseBooleanArray;
 import android.view.View;
@@ -23,7 +21,6 @@ import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ListView;
 import android.widget.ProgressBar;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -56,10 +53,6 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
     private static final String path = Environment.getExternalStorageDirectory() + "/Comptes";
 
     private static Logger logger = Logger.getLogger("InfoLogging");
-
-    private ArrayAdapter mAdapter = null;
-
-    private ArrayAdapter mAdapterDrive = null;
 
     private ListView listFilePhone = null;
 
@@ -124,7 +117,7 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
             requestPermission();
             int i = 0;
             while (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                    != PackageManager.PERMISSION_GRANTED && i < 30) {
+                    != PackageManager.PERMISSION_GRANTED && i < 5) {
                 try {
                     Thread.sleep(1000);
                     i++;
@@ -132,7 +125,7 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
                     e.printStackTrace();
                 }
             }
-            if (i >= 30) {
+            if (i >= 5) {
                 finish();
             }
         }
@@ -157,8 +150,8 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
 
             listFilePhone = (ListView) findViewById(R.id.listViewPhone);
 
-            supprimerDepensesPhone = (Button) findViewById(R.id.supprimerDepenses);
-            creerDepense = (Button) findViewById(R.id.creerDepense);
+            supprimerDepensesPhone = findViewById(R.id.supprimerDepenses);
+            creerDepense = this.<Button>findViewById(R.id.creerDepense);
 
             exportDepenses = findViewById(R.id.exportDepense);
             importDepenses = findViewById(R.id.importDepense);
@@ -434,9 +427,7 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
                 }
             }).execute(files).get();
 
-        } catch (ExecutionException e) {
-            e.printStackTrace();
-        } catch (InterruptedException e) {
+        } catch (ExecutionException | InterruptedException e) {
             e.printStackTrace();
         } catch (Exception e) {
             logger.info(e.getMessage());
@@ -532,9 +523,7 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
                     }
                 }).execute(files).get();
 
-            } catch (ExecutionException e) {
-                e.printStackTrace();
-            } catch (InterruptedException e) {
+            } catch (ExecutionException | InterruptedException e) {
                 e.printStackTrace();
             } catch (Exception e) {
                 logger.info(e.getMessage());
@@ -590,9 +579,7 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
                 }
             }).execute(files).get();
 
-        } catch (ExecutionException e) {
-            logger.info(e.getMessage());
-        } catch (InterruptedException e) {
+        } catch (ExecutionException | InterruptedException e) {
             logger.info(e.getMessage());
         } catch (Exception e) {
             logger.info(e.getMessage());
@@ -781,7 +768,7 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
      */
     public void updateDataPhone() {
 
-        mAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_multiple_choice, new ArrayList<String>(mapFilePhone.values()));
+        ArrayAdapter<String> mAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_multiple_choice, new ArrayList<String>(mapFilePhone.values()));
 
         listFilePhone.setAdapter(mAdapter);
     }
@@ -792,7 +779,7 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
      */
     public void updateDataDrive() {
 
-        mAdapterDrive = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_multiple_choice, new ArrayList<String>(mapFileDrive.values()));
+        ArrayAdapter<String> mAdapterDrive = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_multiple_choice, new ArrayList<String>(mapFileDrive.values()));
 
         listFileDrive.setAdapter(mAdapterDrive);
     }

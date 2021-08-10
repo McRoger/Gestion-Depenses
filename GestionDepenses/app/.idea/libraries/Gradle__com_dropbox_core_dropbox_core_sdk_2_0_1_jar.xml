@@ -1,0 +1,13 @@
+<component name="libraryTable">
+  <library name="Gradle: com.dropbox.core:dropbox-core-sdk:2.0.1@jar">
+    <CLASSES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.dropbox.core/dropbox-core-sdk/2.0.1/77167a7c620a5c94426c74c13c547cfad310729a/dropbox-core-sdk-2.0.1.jar!/" />
+    </CLASSES>
+    <JAVADOC>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.dropbox.core/dropbox-core-sdk/2.0.1/fb103ec3a437f13269a2a2944ef330e7220e1a43/dropbox-core-sdk-2.0.1-javadoc.jar!/" />
+    </JAVADOC>
+    <SOURCES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.dropbox.core/dropbox-core-sdk/2.0.1/644a4df13eceef765076e16cb12ce09d8840ca52/dropbox-core-sdk-2.0.1-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>
