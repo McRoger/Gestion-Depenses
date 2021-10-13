@@ -17,7 +17,7 @@
         android:theme="@style/AppTheme"
         android:requestLegacyExternalStorage="true" >
         <activity
-            android:name=".LoginActivity"
+            android:name="com.app.dropbox.LoginActivity"
             android:label="@string/title_activity_login"
             android:theme="@style/AppTheme.NoActionBar"></activity>
         <activity android:name=".MainActivity">

@@ -1,4 +1,4 @@
-package com.app.gestiondepenses;
+package com.app.dropbox;
 
 
 import android.content.Context;
@@ -8,6 +8,8 @@ import android.os.Bundle;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.app.gestiondepenses.MainActivity;
+import com.app.gestiondepenses.R;
 import com.dropbox.core.android.Auth;
 
 public class LoginActivity extends AppCompatActivity {

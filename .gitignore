@@ -13,11 +13,8 @@
 .externalNativeBuild
 .cxx
 local.properties
-.idea/workspace.xml
-.idea/sonarlint/issuestore/index.pb
-.idea/sonarlint/issuestore/f/b/fbe448ebfc3eb2d4e308f6b8b043666f5b57235e
-.idea/sonarlint/issuestore/f/4/f4a01d6a4fcb971362ec00a83903fd3902f52164
-.idea/sonarlint/issuestore/f/0/f07866736216be0ee2aba49e392191aeae700a35
-.idea/sonarlint/issuestore/1/a/1aba9df4f6deac4ab470438d740298eb656ea514
-.idea/sonarlint/issuestore/0/5/05efc8b1657769a27696d478ded1e95f38737233
+.idea
+.idea/sonarlint/issuestore/0/7/0712df971a99ac4d2fccb8e0fb19f377f3374cca
+.idea/sonarlint/issuestore/7/4/744d8d411b92fb56dfba25c4da3db7d7efaeb680
+.idea/sonarlint/issuestore/b/0/b0f8e0f5252187386c1a1fb6b2f67a466b1103fa
 .idea/workspace.xml

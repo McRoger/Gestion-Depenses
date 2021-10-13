@@ -1,8 +1,8 @@
-package com.app.gestiondepenses;
+package com.app.tasks;
 
-import android.content.Context;
 import android.os.AsyncTask;
 
+import com.app.interfaceGestion.Callback;
 import com.dropbox.core.DbxException;
 import com.dropbox.core.v2.DbxClientV2;
 import com.dropbox.core.v2.files.FileMetadata;
@@ -10,38 +10,22 @@ import com.dropbox.core.v2.files.FileMetadata;
 import java.io.File;
 import java.util.ArrayList;
 
-class DeleteFileTask extends AsyncTask {
+public class DeleteFileTask extends AsyncTask<ArrayList<File>, Void, ArrayList<File>> {
 
     private final DbxClientV2 mDbxClient;
-    private final DeleteFileTask.Callback mCallback;
+    private final Callback mCallback;
     private Exception mException;
 
-    public interface Callback {
-        void onDeleteComplete(Object result);
-
-        void onError(Exception e);
-    }
-
-    DeleteFileTask(Context context, DbxClientV2 dbxClient, DeleteFileTask.Callback callback) {
+    public DeleteFileTask(DbxClientV2 dbxClient, Callback callback) {
         mDbxClient = dbxClient;
         mCallback = callback;
     }
 
+    @SafeVarargs
     @Override
-    protected void onPostExecute(Object result) {
-        super.onPostExecute(result);
-        if (mException != null) {
-            mCallback.onError(mException);
-        } else {
-            mCallback.onDeleteComplete(result);
-        }
-    }
-
-    @Override
-    protected Object doInBackground(Object[] params) {
-
+    protected final ArrayList<File> doInBackground(ArrayList<File>... arrayLists) {
         ArrayList<File> files = new ArrayList<>();
-        for (File file : (ArrayList<File>) params[0]) {
+        for (File file : arrayLists[0]) {
             try {
                 FileMetadata metadata = (FileMetadata) mDbxClient.files().getMetadata("/" + file.getName());
                 mDbxClient.files().delete(metadata.getPathLower());
@@ -54,4 +38,15 @@ class DeleteFileTask extends AsyncTask {
 
         return files;
     }
+
+    @Override
+    protected void onPostExecute(ArrayList<File> result) {
+        super.onPostExecute(result);
+        if (mException != null) {
+            mCallback.onError(mException);
+        } else {
+            mCallback.onTaskComplete(result);
+        }
+    }
+
 }

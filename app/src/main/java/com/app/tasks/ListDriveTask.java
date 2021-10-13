@@ -1,9 +1,10 @@
-package com.app.gestiondepenses;
+package com.app.tasks;
 
-import android.content.Context;
 import android.os.AsyncTask;
 import android.os.Environment;
 
+import com.app.gestiondepenses.MainActivity;
+import com.app.interfaceGestion.Callback;
 import com.dropbox.core.DbxException;
 import com.dropbox.core.v2.DbxClientV2;
 import com.dropbox.core.v2.files.FileMetadata;
@@ -16,36 +17,32 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 
-public class ListDriveTask extends AsyncTask {
+public class ListDriveTask extends AsyncTask<ArrayList<File>,Void,ArrayList<File>> {
 
     private final DbxClientV2 mDbxClient;
-    private final ListDriveTask.Callback mCallback;
+    private final Callback mCallback;
     private Exception mException;
 
-    public interface Callback {
-        void onDownloadComplete(Object result);
 
-        void onError(Exception e);
-    }
-
-    ListDriveTask(Context context, DbxClientV2 dbxClient, ListDriveTask.Callback callback) {
+    public ListDriveTask(DbxClientV2 dbxClient, Callback callback) {
         mDbxClient = dbxClient;
         mCallback = callback;
     }
 
     @Override
-    protected void onPostExecute(Object result) {
+    protected void onPostExecute(ArrayList<File> result) {
         super.onPostExecute(result);
         if (mException != null) {
             mCallback.onError(mException);
         } else {
-            mCallback.onDownloadComplete(result);
+            mCallback.onTaskComplete(result);
         }
     }
 
 
+    @SafeVarargs
     @Override
-    protected Object doInBackground(Object[] params) {
+    protected final ArrayList<File> doInBackground(ArrayList<File>... arrayLists) {
 
         ArrayList<File> files = new ArrayList<>();
         try {

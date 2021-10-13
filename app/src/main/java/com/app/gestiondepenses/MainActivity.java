@@ -26,6 +26,14 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import com.app.dropbox.DropboxClient;
+import com.app.dropbox.LoginActivity;
+import com.app.interfaceGestion.Callback;
+import com.app.tasks.DeleteFileTask;
+import com.app.tasks.DownloadFileTask;
+import com.app.tasks.ListDriveTask;
+import com.app.tasks.UploadFileTask;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -45,7 +53,7 @@ import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Logger;
 
-public class MainActivity<mainActivity> extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity {
 
     private String ACCESS_TOKEN;
     private static final int REQUEST_PERMISSION = 1;
@@ -94,12 +102,7 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
                 try {
                     while (!isInterrupted()) {
                         Thread.sleep(100);
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                testButton();
-                            }
-                        });
+                        runOnUiThread(() -> checkInternetAccess());
                     }
                 } catch (InterruptedException e) {
                 }
@@ -334,24 +337,21 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
 
         try {
 
-            new DeleteFileTask(getApplicationContext(), DropboxClient.getClient(ACCESS_TOKEN), new DeleteFileTask.Callback() {
+            DeleteFileTask deleteFileTask= new DeleteFileTask(DropboxClient.getClient(ACCESS_TOKEN), new Callback() {
                 @Override
-                public void onDeleteComplete(Object o) {
-                    if (o != null) {
-                        ArrayList<File> result = (ArrayList<File>) o;
-                        for (File file : result) {
-                            removeListDrive(file);
-                        }
-                        updateDataDrive();
+                public void onTaskComplete(ArrayList<File> result) {
+                    for (File file : result) {
+                        removeListDrive(file);
                     }
-
+                    updateDataDrive();
                 }
 
                 @Override
                 public void onError(Exception e) {
 
                 }
-            }).execute(files).get();
+            });
+            deleteFileTask.execute(files).get();
 
         } catch (ExecutionException | InterruptedException e) {
             e.printStackTrace();
@@ -431,10 +431,9 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
         if (!files.isEmpty()) {
 
             try {
-                new UploadFileTask(DropboxClient.getClient(ACCESS_TOKEN), new UploadFileTask.Callback() {
+                new UploadFileTask(DropboxClient.getClient(ACCESS_TOKEN), new Callback() {
                     @Override
-                    public void onUploadComplete(Object o) {
-                        ArrayList<File> result = (ArrayList<File>) o;
+                    public void onTaskComplete(ArrayList<File> result) {
                         for (File file : result) {
                             addListDrive(file);
                             removeListPhone(file);
@@ -481,11 +480,9 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
 
 
         try {
-            new DownloadFileTask(getApplicationContext(), DropboxClient.getClient(ACCESS_TOKEN), new DownloadFileTask.Callback() {
+            DownloadFileTask downloadFileTask=new DownloadFileTask(getApplicationContext(), DropboxClient.getClient(ACCESS_TOKEN), new Callback() {
                 @Override
-                public void onDownloadComplete(Object o) {
-                    if (o != null) {
-                        ArrayList<File> result = (ArrayList<File>) o;
+                public void onTaskComplete(ArrayList<File> result) {
                         for (File file : result) {
                             removeListDrive(file);
                             if (!"".equals(readFile(file))) {
@@ -496,14 +493,14 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
                         }
                         updateDataPhone();
                         updateDataDrive();
-                    }
                 }
 
                 @Override
                 public void onError(Exception e) {
 
                 }
-            }).execute(files).get();
+            });
+            downloadFileTask.execute(files).get();
 
         } catch (Exception e) {
             logger.info(e.getMessage());
@@ -618,18 +615,15 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
 
         try {
 
-            new ListDriveTask(getApplicationContext(), DropboxClient.getClient(ACCESS_TOKEN), new ListDriveTask.Callback() {
+            ListDriveTask listDriveTask=new ListDriveTask(DropboxClient.getClient(ACCESS_TOKEN), new Callback() {
                 @Override
-                public void onDownloadComplete(Object o) {
-                    if (o != null) {
-                        ArrayList<File> result = (ArrayList<File>) o;
+                public void onTaskComplete(ArrayList<File> result) {
                         for (File file : result) {
                             if (readFile(file) != null) {
                                 addListDrive(file);
                             }
                             deleteFolder(file);
                         }
-                    }
                     updateDataDrive();
                 }
 
@@ -637,7 +631,8 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
                 public void onError(Exception e) {
 
                 }
-            }).execute().get();
+            });
+            listDriveTask.execute().get();
 
         } catch (ExecutionException | InterruptedException e) {
             e.printStackTrace();
@@ -750,7 +745,7 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
      *
      * @return
      */
-    public boolean testButton() {
+    public boolean checkInternetAccess() {
         ConnectivityManager connectivityManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
         NetworkInfo networkInfo = connectivityManager.getActiveNetworkInfo();
 

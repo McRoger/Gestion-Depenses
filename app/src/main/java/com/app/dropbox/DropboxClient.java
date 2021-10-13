@@ -1,4 +1,4 @@
-package com.app.gestiondepenses;
+package com.app.dropbox;
 
 import com.dropbox.core.DbxRequestConfig;
 import com.dropbox.core.v2.DbxClientV2;
