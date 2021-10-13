@@ -59,7 +59,7 @@ public class MainActivity extends AppCompatActivity {
 
     private String ACCESS_TOKEN;
 
-    private  static final Logger LOGGER = Logger.getLogger(MainActivity.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(MainActivity.class.getName());
 
     private static final int REQUEST_PERMISSION = 1;
     private static final String PATH = Environment.getExternalStorageDirectory() + "/Comptes";
@@ -549,8 +549,9 @@ public class MainActivity extends AppCompatActivity {
     @RequiresApi(api = Build.VERSION_CODES.O)
     public static void deleteFolder(File folder) {
         File[] files = folder.listFiles();
-        if (files != null) { //some JVMs return null for empty dirs
-            try {
+        try {
+            if (files != null) { //some JVMs return null for empty dirs
+
                 for (File f : files) {
                     if (f.isDirectory()) {
                         deleteFolder(f);
@@ -560,279 +561,279 @@ public class MainActivity extends AppCompatActivity {
 
                     }
                 }
-
-                Files.delete(folder.toPath());
-            } catch (IOException e) {
-                Logger.getLogger(e.getMessage());
             }
+            Files.delete(folder.toPath());
+        } catch (IOException e) {
+            Logger.getLogger(e.getMessage());
         }
+
     }
 
 
-        /**
-         * Création d'une dépense
-         */
-        private void createFile () {
+    /**
+     * Création d'une dépense
+     */
+    private void createFile() {
 
-            if (!nomDepense.getText().toString().isEmpty() && !cout.getText().toString().isEmpty()) {
-                List<String> lines = Arrays.asList(nomDepense.getText().toString() + "|" + cout.getText().toString());
-                Path pathFile = null;
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    String nomFichier = new Timestamp(System.currentTimeMillis()).toString();
-                    pathFile = Paths.get(PATH + "/" + nomFichier.replace(":", " ") + ".txt");
+        if (!nomDepense.getText().toString().isEmpty() && !cout.getText().toString().isEmpty()) {
+            List<String> lines = Arrays.asList(nomDepense.getText().toString() + "|" + cout.getText().toString());
+            Path pathFile = null;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                String nomFichier = new Timestamp(System.currentTimeMillis()).toString();
+                pathFile = Paths.get(PATH + "/" + nomFichier.replace(":", " ") + ".txt");
 
-                    try {
-                        Files.write(pathFile, lines, StandardCharsets.UTF_8);
-                        File file = pathFile.toFile();
-                        addListPhone(file);
-                        updateDataPhone();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
+                try {
+                    Files.write(pathFile, lines, StandardCharsets.UTF_8);
+                    File file = pathFile.toFile();
+                    addListPhone(file);
+                    updateDataPhone();
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
-
-
-                Toast.makeText(MainActivity.this, "Une dépense a été créée !", Toast.LENGTH_LONG).show();
-                nomDepense.setText("");
-                cout.setText("");
             }
 
+
+            Toast.makeText(MainActivity.this, "Une dépense a été créée !", Toast.LENGTH_LONG).show();
+            nomDepense.setText("");
+            cout.setText("");
         }
 
-        /**
-         * Récupère tous les fichiers présents sur l'appareil
-         */
-        @RequiresApi(api = Build.VERSION_CODES.O)
-        private void getFilesPhone () {
+    }
 
-            Logger.getLogger("Permission granted");
+    /**
+     * Récupère tous les fichiers présents sur l'appareil
+     */
+    @RequiresApi(api = Build.VERSION_CODES.O)
+    private void getFilesPhone() {
 
-            File directory = new File(PATH);
+        Logger.getLogger("Permission granted");
 
-            //si le dossier n'existe pas, il est créé
-            if (!directory.exists())
-                (new File(PATH)).mkdirs();
+        File directory = new File(PATH);
 
-            File[] files = directory.listFiles();
+        //si le dossier n'existe pas, il est créé
+        if (!directory.exists())
+            (new File(PATH)).mkdirs();
 
-            mapFilePhone.clear();
+        File[] files = directory.listFiles();
 
-            for (int i = 0; i < files.length; i++) {
-                addListPhone(files[i]);
-            }
+        mapFilePhone.clear();
 
-            updateDataPhone();
+        for (int i = 0; i < files.length; i++) {
+            addListPhone(files[i]);
         }
 
+        updateDataPhone();
+    }
 
-        /**
-         * Récupère et liste tous les fichiers présents sur le drive
-         */
-        private void getFilesDrive () {
-            mapFileDrive.clear();
 
-            try {
+    /**
+     * Récupère et liste tous les fichiers présents sur le drive
+     */
+    private void getFilesDrive() {
+        mapFileDrive.clear();
 
-                ListDriveTask listDriveTask = new ListDriveTask(DropboxClient.getClient(ACCESS_TOKEN), new Callback() {
-                    @RequiresApi(api = Build.VERSION_CODES.O)
-                    @Override
-                    public void onTaskComplete(ArrayList<File> result) {
-                        for (File file : result) {
-                            if (readFile(file) != null) {
-                                addListDrive(file);
-                            }
-                            deleteFolder(file);
+        try {
+
+            ListDriveTask listDriveTask = new ListDriveTask(DropboxClient.getClient(ACCESS_TOKEN), new Callback() {
+                @RequiresApi(api = Build.VERSION_CODES.O)
+                @Override
+                public void onTaskComplete(ArrayList<File> result) {
+                    for (File file : result) {
+                        if (readFile(file) != null) {
+                            addListDrive(file);
                         }
-                        updateDataDrive();
+                        deleteFolder(file);
                     }
-
-                    @Override
-                    public void onError(Exception e) {
-                        Logger.getLogger(e.getMessage());
-                    }
-                });
-                listDriveTask.execute().get();
-
-            } catch (ExecutionException | InterruptedException e) {
-                Thread.currentThread().interrupt();
-                e.printStackTrace();
-            }
-        }
-
-        /**
-         * Lit le fichier txt
-         *
-         * @param fichier Fichier txt
-         * @return
-         */
-        public static String readFile (File fichier){
-            String line = null;
-            List<String> listeLignes = new ArrayList<>();
-
-            // FileReader reads text files in the default encoding.
-            // Always wrap FileReader in BufferedReader.
-            try (FileReader fileReader =
-                         new FileReader(fichier); BufferedReader bufferedReader =
-                         new BufferedReader(fileReader)) {
-
-                while ((line = bufferedReader.readLine()) != null) {
-                    listeLignes.add(line);
+                    updateDataDrive();
                 }
 
-            } catch (FileNotFoundException ex) {
-                Logger.getLogger("Impossible d'ouvrir le fichier " + fichier);
-            } catch (IOException ex) {
-                Logger.getLogger("Impossible de lire le fichier " + fichier);
-            }
-
-            if (!listeLignes.isEmpty()) {
-                return listeLignes.get(0);
-            } else {
-                return null;
-            }
-        }
-
-
-        /**
-         * Met à jour la liste affichée des dépenses de l'appareil
-         */
-        public void updateDataPhone () {
-
-            ArrayAdapter<String> mAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_multiple_choice, new ArrayList<>(mapFilePhone.values()));
-
-            listFilePhone.setAdapter(mAdapter);
-        }
-
-
-        /**
-         * Met à jour la liste affichée des dépenses du drive
-         */
-        public void updateDataDrive () {
-
-            ArrayAdapter<String> mAdapterDrive = new ArrayAdapter<>(this, android.R.layout.simple_list_item_multiple_choice, new ArrayList<>(mapFileDrive.values()));
-
-            listFileDrive.setAdapter(mAdapterDrive);
-        }
-
-        /**
-         * Vérifie l'existence du token
-         *
-         * @return
-         */
-        private boolean tokenExists () {
-            SharedPreferences prefs = getSharedPreferences("com.app.gestiondepenses", Context.MODE_PRIVATE);
-            String accessToken = prefs.getString("access-token", null);
-            return accessToken != null;
-        }
-
-        /**
-         * Vérifie si un token est déjà disponible sur l'appareil
-         *
-         * @return
-         */
-        private String retrieveAccessToken () {
-            //check if ACCESS_TOKEN is stored on previous app launches
-            SharedPreferences prefs = getSharedPreferences("com.app.gestiondepenses", Context.MODE_PRIVATE);
-            String accessToken = prefs.getString("access-token", null);
-            if (accessToken == null) {
-                Log.d("AccessToken Status", "No token found");
-                return null;
-            } else {
-                //accessToken already exists
-                Log.d("AccessToken Status", "Token exists");
-                return accessToken;
-            }
-        }
-
-        /**
-         * Demande l'autorisation pour écrire sur l'appareil
-         */
-        private void requestPermission () {
-            ActivityCompat.requestPermissions(
-                    this,
-                    new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
-                    REQUEST_PERMISSION);
-        }
-
-        /**
-         * Indique si le réseau internet est disponible
-         *
-         * @return True si un accès réseau est disponible
-         */
-        private Boolean isNetworkAvailable () {
-            ConnectivityManager connectivityManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
-            Network nw = connectivityManager.getActiveNetwork();
-            if (nw == null) return false;
-            NetworkCapabilities actNw = connectivityManager.getNetworkCapabilities(nw);
-            return actNw != null && (actNw.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || actNw.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) || actNw.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) || actNw.hasTransport(NetworkCapabilities.TRANSPORT_BLUETOOTH));
-        }
-
-
-        /**
-         * Donne la possibilité de cliquer sur les boutons en fonctions du réseau et de la contenance des listes
-         *
-         * @return
-         */
-        @RequiresApi(api = Build.VERSION_CODES.O)
-        public boolean checkInternetAccess () {
-
-            if (!Boolean.TRUE.equals(isNetworkAvailable())) {
-                accesInternet = false;
-            } else {
-                if (Boolean.FALSE.equals(accesInternet)) {
-                    getFilesDrive();
-                    getFilesPhone();
+                @Override
+                public void onError(Exception e) {
+                    Logger.getLogger(e.getMessage());
                 }
-                accesInternet = true;
+            });
+            listDriveTask.execute().get();
 
-            }
-
-            if (exportDepenses != null) {
-                exportDepenses.setEnabled(accesInternet && areItemsChecked(listFilePhone) && isCliquable);
-
-            }
-
-            if (importDepenses != null) {
-                importDepenses.setEnabled(accesInternet && areItemsChecked(listFileDrive) && isCliquable);
-
-            }
-
-            if (supprimerDepensesDrive != null) {
-                supprimerDepensesDrive.setEnabled(accesInternet && areItemsChecked(listFileDrive) && isCliquable);
-
-            }
-
-            if (supprimerDepensesPhone != null) {
-                supprimerDepensesPhone.setEnabled(areItemsChecked(listFilePhone) && isCliquable);
-
-            }
-
-            if (listFileDrive != null) {
-                listFileDrive.setEnabled(accesInternet && isCliquable);
-
-            }
-
-            if (listFilePhone != null) {
-                listFilePhone.setEnabled(isCliquable);
-
-            }
-
-            if (refreshListDrive != null) {
-                refreshListDrive.setEnabled(accesInternet && isCliquable);
-
-            }
-
-            if (refreshListPhone != null) {
-                refreshListPhone.setEnabled(isCliquable);
-
-            }
-
-            if (null != creerDepense) {
-                creerDepense.setEnabled(isCliquable);
-            }
-
-            return accesInternet;
+        } catch (ExecutionException | InterruptedException e) {
+            Thread.currentThread().interrupt();
+            e.printStackTrace();
         }
-
     }
+
+    /**
+     * Lit le fichier txt
+     *
+     * @param fichier Fichier txt
+     * @return
+     */
+    public static String readFile(File fichier) {
+        String line = null;
+        List<String> listeLignes = new ArrayList<>();
+
+        // FileReader reads text files in the default encoding.
+        // Always wrap FileReader in BufferedReader.
+        try (FileReader fileReader =
+                     new FileReader(fichier); BufferedReader bufferedReader =
+                     new BufferedReader(fileReader)) {
+
+            while ((line = bufferedReader.readLine()) != null) {
+                listeLignes.add(line);
+            }
+
+        } catch (FileNotFoundException ex) {
+            Logger.getLogger("Impossible d'ouvrir le fichier " + fichier);
+        } catch (IOException ex) {
+            Logger.getLogger("Impossible de lire le fichier " + fichier);
+        }
+
+        if (!listeLignes.isEmpty()) {
+            return listeLignes.get(0);
+        } else {
+            return null;
+        }
+    }
+
+
+    /**
+     * Met à jour la liste affichée des dépenses de l'appareil
+     */
+    public void updateDataPhone() {
+
+        ArrayAdapter<String> mAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_multiple_choice, new ArrayList<>(mapFilePhone.values()));
+
+        listFilePhone.setAdapter(mAdapter);
+    }
+
+
+    /**
+     * Met à jour la liste affichée des dépenses du drive
+     */
+    public void updateDataDrive() {
+
+        ArrayAdapter<String> mAdapterDrive = new ArrayAdapter<>(this, android.R.layout.simple_list_item_multiple_choice, new ArrayList<>(mapFileDrive.values()));
+
+        listFileDrive.setAdapter(mAdapterDrive);
+    }
+
+    /**
+     * Vérifie l'existence du token
+     *
+     * @return
+     */
+    private boolean tokenExists() {
+        SharedPreferences prefs = getSharedPreferences("com.app.gestiondepenses", Context.MODE_PRIVATE);
+        String accessToken = prefs.getString("access-token", null);
+        return accessToken != null;
+    }
+
+    /**
+     * Vérifie si un token est déjà disponible sur l'appareil
+     *
+     * @return
+     */
+    private String retrieveAccessToken() {
+        //check if ACCESS_TOKEN is stored on previous app launches
+        SharedPreferences prefs = getSharedPreferences("com.app.gestiondepenses", Context.MODE_PRIVATE);
+        String accessToken = prefs.getString("access-token", null);
+        if (accessToken == null) {
+            Log.d("AccessToken Status", "No token found");
+            return null;
+        } else {
+            //accessToken already exists
+            Log.d("AccessToken Status", "Token exists");
+            return accessToken;
+        }
+    }
+
+    /**
+     * Demande l'autorisation pour écrire sur l'appareil
+     */
+    private void requestPermission() {
+        ActivityCompat.requestPermissions(
+                this,
+                new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                REQUEST_PERMISSION);
+    }
+
+    /**
+     * Indique si le réseau internet est disponible
+     *
+     * @return True si un accès réseau est disponible
+     */
+    private Boolean isNetworkAvailable() {
+        ConnectivityManager connectivityManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+        Network nw = connectivityManager.getActiveNetwork();
+        if (nw == null) return false;
+        NetworkCapabilities actNw = connectivityManager.getNetworkCapabilities(nw);
+        return actNw != null && (actNw.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || actNw.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) || actNw.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) || actNw.hasTransport(NetworkCapabilities.TRANSPORT_BLUETOOTH));
+    }
+
+
+    /**
+     * Donne la possibilité de cliquer sur les boutons en fonctions du réseau et de la contenance des listes
+     *
+     * @return
+     */
+    @RequiresApi(api = Build.VERSION_CODES.O)
+    public boolean checkInternetAccess() {
+
+        if (!Boolean.TRUE.equals(isNetworkAvailable())) {
+            accesInternet = false;
+        } else {
+            if (Boolean.FALSE.equals(accesInternet)) {
+                getFilesDrive();
+                getFilesPhone();
+            }
+            accesInternet = true;
+
+        }
+
+        if (exportDepenses != null) {
+            exportDepenses.setEnabled(accesInternet && areItemsChecked(listFilePhone) && isCliquable);
+
+        }
+
+        if (importDepenses != null) {
+            importDepenses.setEnabled(accesInternet && areItemsChecked(listFileDrive) && isCliquable);
+
+        }
+
+        if (supprimerDepensesDrive != null) {
+            supprimerDepensesDrive.setEnabled(accesInternet && areItemsChecked(listFileDrive) && isCliquable);
+
+        }
+
+        if (supprimerDepensesPhone != null) {
+            supprimerDepensesPhone.setEnabled(areItemsChecked(listFilePhone) && isCliquable);
+
+        }
+
+        if (listFileDrive != null) {
+            listFileDrive.setEnabled(accesInternet && isCliquable);
+
+        }
+
+        if (listFilePhone != null) {
+            listFilePhone.setEnabled(isCliquable);
+
+        }
+
+        if (refreshListDrive != null) {
+            refreshListDrive.setEnabled(accesInternet && isCliquable);
+
+        }
+
+        if (refreshListPhone != null) {
+            refreshListPhone.setEnabled(isCliquable);
+
+        }
+
+        if (null != creerDepense) {
+            creerDepense.setEnabled(isCliquable);
+        }
+
+        return accesInternet;
+    }
+
+}
 
