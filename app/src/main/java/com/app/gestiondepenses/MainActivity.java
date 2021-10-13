@@ -1,4 +1,4 @@
-package com.example.gestiondepenses;
+package com.app.gestiondepenses;
 
 
 import android.Manifest;
@@ -14,7 +14,6 @@ import android.os.Environment;
 import android.util.Log;
 import android.util.SparseBooleanArray;
 import android.view.View;
-import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
@@ -32,7 +31,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -50,7 +49,7 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
 
     private String ACCESS_TOKEN;
     private static final int REQUEST_PERMISSION = 1;
-    private static final String path = Environment.getExternalStorageDirectory() + "/Comptes";
+    private static final String PATH = Environment.getExternalStorageDirectory() + "/Comptes";
 
     private static Logger logger = Logger.getLogger("InfoLogging");
 
@@ -164,175 +163,102 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
 
             getFilesPhone();
             getFilesDrive();
-            creerDepense.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    isCliquable = false;
-                    createFile();
+            creerDepense.setOnClickListener(view -> {
+                isCliquable = false;
+                createFile();
+                isCliquable = true;
+            });
+
+            exportDepenses.setOnClickListener(view -> new Thread(() -> {
+                isCliquable = false;
+
+                MainActivity.this.handler.post(() -> progressBar.setVisibility(View.VISIBLE));
+                upload();
+                MainActivity.this.handler.post(() -> {
+                    progressBar.setVisibility(View.GONE);
                     isCliquable = true;
-                }
-            });
+                });
 
-            exportDepenses.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
+            }
+            ).start());
 
-                    new Thread(new Runnable() {
-                        public void run() {
-                            isCliquable = false;
+            supprimerDepensesPhone.setOnClickListener(v -> new Thread(() -> {
 
-                            MainActivity.this.handler.post(new Runnable() {
-                                public void run() {
-                                    progressBar.setVisibility(View.VISIBLE);
-                                }
-                            });
-                            upload();
-                            MainActivity.this.handler.post(new Runnable() {
-                                public void run() {
-                                    progressBar.setVisibility(View.GONE);
-                                    isCliquable = true;
-                                }
-                            });
-
-                        }
-                    }
-                    ).start();
-
-                }
-            });
-
-            supprimerDepensesPhone.setOnClickListener(new AdapterView.OnClickListener() {
-
-                @Override
-                public void onClick(View v) {
-                 new Thread(new Runnable() {
-                        public void run() {
-
-                            MainActivity.this.handler.post(new Runnable() {
-                                public void run() {
-                                    isCliquable = false;
-
-                                    progressBar.setVisibility(View.VISIBLE);
-                                }
-                            });
-                            deletePhone();
-
-                            MainActivity.this.handler.post(new Runnable() {
-                                public void run() {
-                                    progressBar.setVisibility(View.GONE);
-                                    isCliquable = true;
-                                    updateDataPhone();
-                                    Toast.makeText(MainActivity.this, "Les dépenses sélectionnées ont été supprimées de l'appareil !", Toast.LENGTH_LONG).show();
-                                }
-                            });
-
-                        }
-                    }
-                    ).start();
-
-                }
-            });
-
-
-            importDepenses.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    new Thread(new Runnable() {
-                        public void run() {
-
-
-                            MainActivity.this.handler.post(new Runnable() {
-                                public void run() {
-                                    isCliquable = false;
-
-                                    progressBar.setVisibility(View.VISIBLE);
-                                }
-                            });
-                            download();
-                            MainActivity.this.handler.post(new Runnable() {
-                                public void run() {
-                                    progressBar.setVisibility(View.GONE);
-                                    isCliquable = true;
-
-                                    Toast.makeText(MainActivity.this, "Les dépenses sélectionnées ont été importées dans l'appareil !", Toast.LENGTH_LONG).show();
-                                }
-                            });
-
-                        }
-                    }
-                    ).start();
-
-                }
-            });
-
-            supprimerDepensesDrive.setOnClickListener(new AdapterView.OnClickListener() {
-
-                @Override
-                public void onClick(View v) {
-                    new Thread(new Runnable() {
-                        public void run() {
-
-
-                            MainActivity.this.handler.post(new Runnable() {
-                                public void run() {
-                                    isCliquable = false;
-
-                                    progressBar.setVisibility(View.VISIBLE);
-                                }
-                            });
-                            deleteDrive();
-                            MainActivity.this.handler.post(new Runnable() {
-                                public void run() {
-                                    progressBar.setVisibility(View.GONE);
-                                    isCliquable = true;
-
-                                    Toast.makeText(MainActivity.this, "Les dépenses sélectionnées ont été supprimées du drive !", Toast.LENGTH_LONG).show();
-                                }
-                            });
-
-                        }
-                    }
-                    ).start();
-
-                }
-            });
-            refreshListPhone.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
+                MainActivity.this.handler.post(() -> {
                     isCliquable = false;
-                    getFilesPhone();
+
+                    progressBar.setVisibility(View.VISIBLE);
+                });
+                deletePhone();
+
+                MainActivity.this.handler.post(() -> {
+                    progressBar.setVisibility(View.GONE);
                     isCliquable = true;
-                }
+                    updateDataPhone();
+                    Toast.makeText(MainActivity.this, "Les dépenses sélectionnées ont été supprimées de l'appareil !", Toast.LENGTH_LONG).show();
+                });
+
+            }
+            ).start());
+
+
+            importDepenses.setOnClickListener(view -> new Thread(() -> {
+
+
+                MainActivity.this.handler.post(() -> {
+                    isCliquable = false;
+
+                    progressBar.setVisibility(View.VISIBLE);
+                });
+                download();
+                MainActivity.this.handler.post(() -> {
+                    progressBar.setVisibility(View.GONE);
+                    isCliquable = true;
+
+                    Toast.makeText(MainActivity.this, "Les dépenses sélectionnées ont été importées dans l'appareil !", Toast.LENGTH_LONG).show();
+                });
+
+            }
+            ).start());
+
+            supprimerDepensesDrive.setOnClickListener(v -> new Thread(() -> {
+
+
+                MainActivity.this.handler.post(() -> {
+                    isCliquable = false;
+
+                    progressBar.setVisibility(View.VISIBLE);
+                });
+                deleteDrive();
+                MainActivity.this.handler.post(() -> {
+                    progressBar.setVisibility(View.GONE);
+                    isCliquable = true;
+
+                    Toast.makeText(MainActivity.this, "Les dépenses sélectionnées ont été supprimées du drive !", Toast.LENGTH_LONG).show();
+                });
+
+            }
+            ).start());
+            refreshListPhone.setOnClickListener(view -> {
+                isCliquable = false;
+                getFilesPhone();
+                isCliquable = true;
             });
 
-            refreshListDrive.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
+            refreshListDrive.setOnClickListener(view -> new Thread(() -> {
 
-                    new Thread(new Runnable() {
-                        public void run() {
+                MainActivity.this.handler.post(() -> {
+                    isCliquable = false;
+                    progressBar.setVisibility(View.VISIBLE);
+                });
+                getFilesDrive();
+                MainActivity.this.handler.post(() -> {
+                    progressBar.setVisibility(View.GONE);
+                    isCliquable = true;
+                });
 
-
-                            MainActivity.this.handler.post(new Runnable() {
-                                public void run() {
-                                    isCliquable = false;
-                                    progressBar.setVisibility(View.VISIBLE);
-                                }
-                            });
-                            getFilesDrive();
-                            MainActivity.this.handler.post(new Runnable() {
-                                public void run() {
-                                    progressBar.setVisibility(View.GONE);
-                                    isCliquable = true;
-                                }
-                            });
-
-                        }
-                    }
-                    ).start();
-
-                }
-            });
+            }
+            ).start());
         }
 
     }
@@ -340,12 +266,12 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
     /**
      * Vérifie si les items sont sélectionnés dans les listes
      *
-     * @param listView_p
+     * @param listViewP
      * @return
      */
-    private boolean areItemsChecked(ListView listView_p) {
+    private boolean areItemsChecked(ListView listViewP) {
 
-        SparseBooleanArray checkItem = listView_p.getCheckedItemPositions();
+        SparseBooleanArray checkItem = listViewP.getCheckedItemPositions();
 
         if (checkItem != null) {
             for (int i = 0; i < checkItem.size(); i++) {
@@ -378,7 +304,7 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
             }
         }
 
-        if (files.size() > 0) {
+        if (!files.isEmpty()) {
             for (File file : files) {
                 removeListPhone(file);
             }
@@ -502,7 +428,7 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
             }
         }
 
-        if (files.size() > 0) {
+        if (!files.isEmpty()) {
 
             try {
                 new UploadFileTask(DropboxClient.getClient(ACCESS_TOKEN), new UploadFileTask.Callback() {
@@ -562,7 +488,7 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
                         ArrayList<File> result = (ArrayList<File>) o;
                         for (File file : result) {
                             removeListDrive(file);
-                            if ("" != readFile(file)) {
+                            if (!"".equals(readFile(file))) {
                                 addListPhone(file);
                             } else {
                                 deleteFolder(file);
@@ -579,8 +505,6 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
                 }
             }).execute(files).get();
 
-        } catch (ExecutionException | InterruptedException e) {
-            logger.info(e.getMessage());
         } catch (Exception e) {
             logger.info(e.getMessage());
         }
@@ -641,10 +565,10 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
             Path pathFile = null;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 String nomFichier = new Timestamp(System.currentTimeMillis()).toString();
-                pathFile = Paths.get(path + "/" + nomFichier.replaceAll(":", " ") + ".txt");
+                pathFile = Paths.get(PATH + "/" + nomFichier.replace(":", " ") + ".txt");
 
                 try {
-                    Files.write(pathFile, lines, Charset.forName("UTF-8"));
+                    Files.write(pathFile, lines, StandardCharsets.UTF_8);
                     File file = pathFile.toFile();
                     addListPhone(file);
                     updateDataPhone();
@@ -668,11 +592,11 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
 
         logger.info("Permission granted");
 
-        File directory = new File(path);
+        File directory = new File(PATH);
 
         //si le dossier n'existe pas, il est créé
         if (!directory.exists())
-            (new File(path)).mkdirs();
+            (new File(PATH)).mkdirs();
 
         File[] files = directory.listFiles();
 
@@ -702,7 +626,6 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
                         for (File file : result) {
                             if (readFile(file) != null) {
                                 addListDrive(file);
-//                                updateDataDrive();
                             }
                             deleteFolder(file);
                         }
@@ -716,9 +639,7 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
                 }
             }).execute().get();
 
-        } catch (ExecutionException e) {
-            e.printStackTrace();
-        } catch (InterruptedException e) {
+        } catch (ExecutionException | InterruptedException e) {
             e.printStackTrace();
         } catch (Exception e) {
             logger.info(e.getMessage());
@@ -755,7 +676,7 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
             logger.info("Impossible de lire le fichier " + fichier);
         }
 
-        if (listeLignes.size() > 0) {
+        if (!listeLignes.isEmpty()) {
             return listeLignes.get(0);
         } else {
             return null;
@@ -768,7 +689,7 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
      */
     public void updateDataPhone() {
 
-        ArrayAdapter<String> mAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_multiple_choice, new ArrayList<String>(mapFilePhone.values()));
+        ArrayAdapter<String> mAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_multiple_choice, new ArrayList<>(mapFilePhone.values()));
 
         listFilePhone.setAdapter(mAdapter);
     }
@@ -779,7 +700,7 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
      */
     public void updateDataDrive() {
 
-        ArrayAdapter<String> mAdapterDrive = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_multiple_choice, new ArrayList<String>(mapFileDrive.values()));
+        ArrayAdapter<String> mAdapterDrive = new ArrayAdapter<>(this, android.R.layout.simple_list_item_multiple_choice, new ArrayList<>(mapFileDrive.values()));
 
         listFileDrive.setAdapter(mAdapterDrive);
     }
@@ -790,7 +711,7 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
      * @return
      */
     private boolean tokenExists() {
-        SharedPreferences prefs = getSharedPreferences("com.example.gestiondepenses", Context.MODE_PRIVATE);
+        SharedPreferences prefs = getSharedPreferences("com.app.gestiondepenses", Context.MODE_PRIVATE);
         String accessToken = prefs.getString("access-token", null);
         return accessToken != null;
     }
@@ -802,7 +723,7 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
      */
     private String retrieveAccessToken() {
         //check if ACCESS_TOKEN is stored on previous app launches
-        SharedPreferences prefs = getSharedPreferences("com.example.gestiondepenses", Context.MODE_PRIVATE);
+        SharedPreferences prefs = getSharedPreferences("com.app.gestiondepenses", Context.MODE_PRIVATE);
         String accessToken = prefs.getString("access-token", null);
         if (accessToken == null) {
             Log.d("AccessToken Status", "No token found");
@@ -834,7 +755,7 @@ public class MainActivity<mainActivity> extends AppCompatActivity {
         NetworkInfo networkInfo = connectivityManager.getActiveNetworkInfo();
 
         if (networkInfo != null && networkInfo.isAvailable() && networkInfo.isConnected()) {
-            if (accesInternet == false) {
+            if (Boolean.FALSE.equals(accesInternet)) {
                 getFilesDrive();
                 getFilesPhone();
             }

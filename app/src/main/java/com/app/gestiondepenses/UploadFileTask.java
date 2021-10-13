@@ -1,4 +1,4 @@
-package com.example.gestiondepenses;
+package com.app.gestiondepenses;
 
 
 import android.os.AsyncTask;
@@ -59,9 +59,7 @@ class UploadFileTask extends AsyncTask{
                         .uploadAndFinish(inputStream);
                 files.add(file);
                 Log.d("Upload Status", "Success");
-                } catch (DbxException e) {
-                    e.printStackTrace();
-                } catch (IOException e) {
+                } catch (DbxException | IOException e) {
                     e.printStackTrace();
                 }
             }

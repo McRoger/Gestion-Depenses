@@ -1,12 +1,10 @@
-package com.example.gestiondepenses;
+package com.app.gestiondepenses;
 
-import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Environment;
-import android.widget.ProgressBar;
 
 import com.dropbox.core.DbxException;
 import com.dropbox.core.v2.DbxClientV2;
@@ -30,6 +28,7 @@ class DownloadFileTask extends AsyncTask {
 
     public interface Callback {
         void onDownloadComplete(Object result);
+
         void onError(Exception e);
     }
 
@@ -38,8 +37,6 @@ class DownloadFileTask extends AsyncTask {
         mDbxClient = dbxClient;
         mCallback = callback;
     }
-    private ProgressDialog progressDialog;
-
 
     @Override
     protected void onPostExecute(Object result) {
@@ -53,14 +50,14 @@ class DownloadFileTask extends AsyncTask {
     }
 
     @Override
-    protected  Object doInBackground(Object[] params) {
+    protected Object doInBackground(Object[] params) {
 
-        ArrayList<File> files=new ArrayList<>();
+        ArrayList<File> files = new ArrayList<>();
 
-        for( File file:  (ArrayList<File>) params[0]) {
+        for (File file : (ArrayList<File>) params[0]) {
             try {
 
-                FileMetadata metadata= (FileMetadata)  mDbxClient.files().getMetadata("/"+file.getName());
+                FileMetadata metadata = (FileMetadata) mDbxClient.files().getMetadata("/" + file.getName());
                 File path = Environment.getExternalStoragePublicDirectory(
                         "Comptes");
                 file = new File(path, metadata.getName());

@@ -1,4 +1,4 @@
-package com.example.gestiondepenses;
+package com.app.gestiondepenses;
 
 import android.content.Context;
 import android.os.AsyncTask;
