@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/541529140/GestionDepenses.iml" filepath="$PROJECT_DIR$/.idea/modules/541529140/GestionDepenses.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/GestionDepenses.app.iml" filepath="$PROJECT_DIR$/.idea/modules/GestionDepenses.app.iml" />
+    </modules>
+  </component>
+</project>
