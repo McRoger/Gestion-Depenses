@@ -48,6 +48,7 @@ import java.nio.file.Paths;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -110,7 +111,7 @@ public class MainActivity extends AppCompatActivity {
                     }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                    Logger.getLogger(e.getMessage());
+                    Logger.getLogger(Objects.requireNonNull(e.getMessage()));
                 }
             }
         };
@@ -157,18 +158,18 @@ public class MainActivity extends AppCompatActivity {
 
             cout = findViewById(R.id.cout);
 
-            listFilePhone = (ListView) findViewById(R.id.listViewPhone);
+            listFilePhone = findViewById(R.id.listViewPhone);
 
             supprimerDepensesPhone = findViewById(R.id.supprimerDepenses);
-            creerDepense = this.<Button>findViewById(R.id.creerDepense);
+            creerDepense = this.findViewById(R.id.creerDepense);
 
             exportDepenses = findViewById(R.id.exportDepense);
             importDepenses = findViewById(R.id.importDepense);
             supprimerDepensesDrive = findViewById(R.id.supprimerDepensesDrive);
             listFileDrive = findViewById(R.id.listViewDrive);
             progressBar = findViewById(R.id.progressBar);
-            refreshListPhone = (ImageButton) findViewById(R.id.refreshListPhone);
-            refreshListDrive = (ImageButton) findViewById(R.id.refreshListDrive);
+            refreshListPhone = findViewById(R.id.refreshListPhone);
+            refreshListDrive = findViewById(R.id.refreshListDrive);
 
 
             getFilesPhone();
@@ -356,7 +357,7 @@ public class MainActivity extends AppCompatActivity {
 
                 @Override
                 public void onError(Exception e) {
-                    Logger.getLogger(e.getMessage());
+                    Logger.getLogger(Objects.requireNonNull(e.getMessage()));
                 }
             });
             deleteFileTask.execute(files).get();
@@ -453,7 +454,7 @@ public class MainActivity extends AppCompatActivity {
 
                     @Override
                     public void onError(Exception e) {
-                        Logger.getLogger(e.getMessage());
+                        Logger.getLogger(Objects.requireNonNull(e.getMessage()));
                     }
                 }).execute(files).get();
 
@@ -506,7 +507,7 @@ public class MainActivity extends AppCompatActivity {
 
                 @Override
                 public void onError(Exception e) {
-                    Logger.getLogger(e.getMessage());
+                    Logger.getLogger(Objects.requireNonNull(e.getMessage()));
                 }
             });
             downloadFileTask.execute(files).get();
@@ -564,7 +565,7 @@ public class MainActivity extends AppCompatActivity {
             }
             Files.delete(folder.toPath());
         } catch (IOException e) {
-            Logger.getLogger(e.getMessage());
+            Logger.getLogger(Objects.requireNonNull(e.getMessage()));
         }
 
     }
@@ -576,8 +577,8 @@ public class MainActivity extends AppCompatActivity {
     private void createFile() {
 
         if (!nomDepense.getText().toString().isEmpty() && !cout.getText().toString().isEmpty()) {
-            List<String> lines = Arrays.asList(nomDepense.getText().toString() + "|" + cout.getText().toString());
-            Path pathFile = null;
+            List<String> lines = Collections.singletonList(nomDepense.getText().toString() + "|" + cout.getText().toString());
+            Path pathFile;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 String nomFichier = new Timestamp(System.currentTimeMillis()).toString();
                 pathFile = Paths.get(PATH + "/" + nomFichier.replace(":", " ") + ".txt");
@@ -618,9 +619,8 @@ public class MainActivity extends AppCompatActivity {
 
         mapFilePhone.clear();
 
-        for (int i = 0; i < files.length; i++) {
-            addListPhone(files[i]);
-        }
+        if (files != null)
+            Arrays.stream(files).forEach(this::addListPhone);
 
         updateDataPhone();
     }
@@ -667,7 +667,7 @@ public class MainActivity extends AppCompatActivity {
      * @return
      */
     public static String readFile(File fichier) {
-        String line = null;
+        String line;
         List<String> listeLignes = new ArrayList<>();
 
         // FileReader reads text files in the default encoding.
@@ -760,7 +760,7 @@ public class MainActivity extends AppCompatActivity {
      *
      * @return True si un accès réseau est disponible
      */
-    private Boolean isNetworkAvailable() {
+    private boolean isNetworkAvailable() {
         ConnectivityManager connectivityManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
         Network nw = connectivityManager.getActiveNetwork();
         if (nw == null) return false;
@@ -775,12 +775,12 @@ public class MainActivity extends AppCompatActivity {
      * @return
      */
     @RequiresApi(api = Build.VERSION_CODES.O)
-    public boolean checkInternetAccess() {
+    public void checkInternetAccess() {
 
-        if (!Boolean.TRUE.equals(isNetworkAvailable())) {
+        if (!isNetworkAvailable()) {
             accesInternet = false;
         } else {
-            if (Boolean.FALSE.equals(accesInternet)) {
+            if (!accesInternet) {
                 getFilesDrive();
                 getFilesPhone();
             }
@@ -832,7 +832,6 @@ public class MainActivity extends AppCompatActivity {
             creerDepense.setEnabled(isCliquable);
         }
 
-        return accesInternet;
     }
 
 }
