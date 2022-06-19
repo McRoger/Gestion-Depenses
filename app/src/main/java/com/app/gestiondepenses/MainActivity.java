@@ -21,6 +21,7 @@ import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ListView;
 import android.widget.ProgressBar;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.RequiresApi;
@@ -29,12 +30,15 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import com.app.dropbox.DropboxClient;
+import com.app.dropbox.DropboxClientFactory;
 import com.app.dropbox.LoginActivity;
 import com.app.interfaceGestion.Callback;
 import com.app.tasks.DeleteFileTask;
 import com.app.tasks.DownloadFileTask;
+import com.app.tasks.GetCurrentAccountTask;
 import com.app.tasks.ListDriveTask;
 import com.app.tasks.UploadFileTask;
+import com.dropbox.core.v2.users.FullAccount;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -56,7 +60,7 @@ import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Logger;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends LoginActivity {
 
     private String ACCESS_TOKEN;
 
@@ -144,15 +148,15 @@ public class MainActivity extends AppCompatActivity {
                 == PackageManager.PERMISSION_GRANTED) {
             setContentView(R.layout.activity_main);
 
-            if (!tokenExists()) {
+//            if (!LoginActivity.hasToken()) {
                 //No token
                 //Back to LoginActivity
-                Intent intent = new Intent(MainActivity.this, LoginActivity.class);
-
-                startActivity(intent);
+//                Intent intent = new Intent(MainActivity.this, LoginActivity.class);
+//
+//                startActivity(intent);
             }
 
-            ACCESS_TOKEN = retrieveAccessToken();
+            ACCESS_TOKEN = "1";
 
             nomDepense = findViewById(R.id.nomDepense);
 
@@ -172,8 +176,11 @@ public class MainActivity extends AppCompatActivity {
             refreshListDrive = findViewById(R.id.refreshListDrive);
 
 
-            getFilesPhone();
-            getFilesDrive();
+        getFilesPhone();
+
+        if(null!=DropboxClientFactory.getClient()) {
+                getFilesDrive();
+            }
             creerDepense.setOnClickListener(view -> {
                 isCliquable = false;
                 createFile();
@@ -270,8 +277,22 @@ public class MainActivity extends AppCompatActivity {
 
             }
             ).start());
-        }
 
+
+    }
+
+    @Override
+    protected void loadData() {
+        new GetCurrentAccountTask(DropboxClientFactory.getClient(), new GetCurrentAccountTask.Callback() {
+            @Override
+            public void onComplete(FullAccount result) {
+            }
+
+            @Override
+            public void onError(Exception e) {
+                Log.e(getClass().getName(), "Failed to get account details.", e);
+            }
+        }).execute();
     }
 
     /**
@@ -346,7 +367,7 @@ public class MainActivity extends AppCompatActivity {
 
         try {
 
-            DeleteFileTask deleteFileTask = new DeleteFileTask(DropboxClient.getClient(ACCESS_TOKEN), new Callback() {
+            DeleteFileTask deleteFileTask = new DeleteFileTask(DropboxClientFactory.getClient(), new Callback() {
                 @Override
                 public void onTaskComplete(ArrayList<File> result) {
                     for (File file : result) {
@@ -440,7 +461,7 @@ public class MainActivity extends AppCompatActivity {
         if (!files.isEmpty()) {
 
             try {
-                new UploadFileTask(DropboxClient.getClient(ACCESS_TOKEN), new Callback() {
+                new UploadFileTask(DropboxClientFactory.getClient(), new Callback() {
                     @RequiresApi(api = Build.VERSION_CODES.O)
                     @Override
                     public void onTaskComplete(ArrayList<File> result) {
@@ -489,7 +510,7 @@ public class MainActivity extends AppCompatActivity {
 
 
         try {
-            DownloadFileTask downloadFileTask = new DownloadFileTask(getApplicationContext(), DropboxClient.getClient(ACCESS_TOKEN), new Callback() {
+            DownloadFileTask downloadFileTask = new DownloadFileTask(getApplicationContext(), DropboxClientFactory.getClient(), new Callback() {
                 @RequiresApi(api = Build.VERSION_CODES.O)
                 @Override
                 public void onTaskComplete(ArrayList<File> result) {
@@ -634,7 +655,7 @@ public class MainActivity extends AppCompatActivity {
 
         try {
 
-            ListDriveTask listDriveTask = new ListDriveTask(DropboxClient.getClient(ACCESS_TOKEN), new Callback() {
+            ListDriveTask listDriveTask = new ListDriveTask(DropboxClientFactory.getClient(), new Callback() {
                 @RequiresApi(api = Build.VERSION_CODES.O)
                 @Override
                 public void onTaskComplete(ArrayList<File> result) {

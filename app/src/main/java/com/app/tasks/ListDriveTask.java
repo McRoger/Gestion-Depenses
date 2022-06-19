@@ -77,9 +77,13 @@ public class ListDriveTask extends AsyncTask<ArrayList<File>,Void,ArrayList<File
 
             // Download the file.
             try (OutputStream outputStream = new FileOutputStream(file)) {
-                mDbxClient.files().download(metadata.getPathLower(), metadata.getRev())
+                mDbxClient.files().download(metadata.getPathLower())
                         .download(outputStream);
-            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
 
             if (MainActivity.readFile(file) != null) {
                 files.add(file);
