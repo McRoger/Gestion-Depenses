@@ -1,7 +1,10 @@
 package com.app.gestiondepenses;
 
 
+import static android.os.storage.StorageManager.ACTION_MANAGE_STORAGE;
+
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -12,6 +15,7 @@ import android.net.NetworkCapabilities;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.storage.StorageManager;
 import android.util.Log;
 import android.util.SparseBooleanArray;
 import android.view.View;
@@ -57,6 +61,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Logger;
 
@@ -67,7 +72,7 @@ public class MainActivity extends LoginActivity {
     private static final Logger LOGGER = Logger.getLogger(MainActivity.class.getName());
 
     private static final int REQUEST_PERMISSION = 1;
-    private static final String PATH = Environment.getExternalStorageDirectory() + "/Comptes";
+    private static File PATH ;
 
     private ListView listFilePhone = null;
 
@@ -122,39 +127,10 @@ public class MainActivity extends LoginActivity {
 
         thread.start();
 
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                != PackageManager.PERMISSION_GRANTED) {
-            // Permission is not granted
-            LOGGER.info("Permission not granted");
-            //demande l'autorisation en écriture
-            requestPermission();
-            int i = 0;
-            while (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                    != PackageManager.PERMISSION_GRANTED && i < 5) {
-                try {
-                    Thread.sleep(1000);
-                    i++;
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    e.printStackTrace();
-                }
-            }
-            if (i >= 5) {
-                finish();
-            }
-        }
+        PATH = ContextCompat.getExternalFilesDirs(getApplicationContext(), null)[0];
 
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                == PackageManager.PERMISSION_GRANTED) {
-            setContentView(R.layout.activity_main);
+        setContentView(R.layout.activity_main);
 
-//            if (!LoginActivity.hasToken()) {
-                //No token
-                //Back to LoginActivity
-//                Intent intent = new Intent(MainActivity.this, LoginActivity.class);
-//
-//                startActivity(intent);
-            }
 
             ACCESS_TOKEN = "1";
 
@@ -510,7 +486,7 @@ public class MainActivity extends LoginActivity {
 
 
         try {
-            DownloadFileTask downloadFileTask = new DownloadFileTask(getApplicationContext(), DropboxClientFactory.getClient(), new Callback() {
+            DownloadFileTask downloadFileTask = new DownloadFileTask(getApplicationContext(), DropboxClientFactory.getClient(), PATH, new Callback() {
                 @RequiresApi(api = Build.VERSION_CODES.O)
                 @Override
                 public void onTaskComplete(ArrayList<File> result) {
@@ -602,7 +578,7 @@ public class MainActivity extends LoginActivity {
             Path pathFile;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 String nomFichier = new Timestamp(System.currentTimeMillis()).toString();
-                pathFile = Paths.get(PATH + "/" + nomFichier.replace(":", " ") + ".txt");
+                pathFile = Paths.get(PATH+ "/" + nomFichier.replace(":", " ") + ".txt");
 
                 try {
                     Files.write(pathFile, lines, StandardCharsets.UTF_8);
@@ -630,13 +606,7 @@ public class MainActivity extends LoginActivity {
 
         Logger.getLogger("Permission granted");
 
-        File directory = new File(PATH);
-
-        //si le dossier n'existe pas, il est créé
-        if (!directory.exists())
-            (new File(PATH)).mkdirs();
-
-        File[] files = directory.listFiles();
+        File[] files = PATH.listFiles();
 
         mapFilePhone.clear();
 
@@ -655,7 +625,7 @@ public class MainActivity extends LoginActivity {
 
         try {
 
-            ListDriveTask listDriveTask = new ListDriveTask(DropboxClientFactory.getClient(), new Callback() {
+            ListDriveTask listDriveTask = new ListDriveTask(DropboxClientFactory.getClient(), PATH, new Callback() {
                 @RequiresApi(api = Build.VERSION_CODES.O)
                 @Override
                 public void onTaskComplete(ArrayList<File> result) {

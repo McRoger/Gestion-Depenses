@@ -30,10 +30,13 @@ class DownloadFileTask extends AsyncTask<ArrayList<File>,Object,ArrayList<File>>
     private final Callback mCallback;
     private Exception mException;
 
-    public DownloadFileTask(Context context, DbxClientV2 dbxClient, Callback callback) {
+    private File mPath;
+
+    public DownloadFileTask(Context context, DbxClientV2 dbxClient,File path, Callback callback) {
         mContext = context;
         mDbxClient = dbxClient;
         mCallback = callback;
+        mPath=path;
     }
 
     @SafeVarargs
@@ -44,18 +47,16 @@ class DownloadFileTask extends AsyncTask<ArrayList<File>,Object,ArrayList<File>>
         for (File file : arrayLists[0]) {
             try {
 
-                FileMetadata metadata = (FileMetadata) mDbxClient.files().getMetadata("/" + file.getName());
-                File path = Environment.getExternalStoragePublicDirectory(
-                        "Comptes");
-                file = new File(path, metadata.getName());
+                FileMetadata metadata = (FileMetadata) mDbxClient.files().getMetadata("/" + file.getName());;
+                file = new File(mPath, metadata.getName());
 
 //             Make sure the Downloads directory exists.
-                if (!path.exists()) {
-                    if (!path.mkdirs()) {
-                        mException = new RuntimeException("Unable to create directory: " + path);
+                if (!mPath.exists()) {
+                    if (!mPath.mkdirs()) {
+                        mException = new RuntimeException("Unable to create directory: " + mPath);
                     }
-                } else if (!path.isDirectory()) {
-                    mException = new IllegalStateException("Download path is not a directory: " + path);
+                } else if (!mPath.isDirectory()) {
+                    mException = new IllegalStateException("Download path is not a directory: " + mPath);
                 }
 
                 // Download the file.

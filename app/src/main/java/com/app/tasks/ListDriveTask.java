@@ -1,7 +1,6 @@
 package com.app.tasks;
 
 import android.os.AsyncTask;
-import android.os.Environment;
 
 import com.app.gestiondepenses.MainActivity;
 import com.app.interfaceGestion.Callback;
@@ -23,10 +22,12 @@ public class ListDriveTask extends AsyncTask<ArrayList<File>,Void,ArrayList<File
     private final Callback mCallback;
     private Exception mException;
 
+    private File mPath;
 
-    public ListDriveTask(DbxClientV2 dbxClient, Callback callback) {
+    public ListDriveTask(DbxClientV2 dbxClient, File path, Callback callback) {
         mDbxClient = dbxClient;
         mCallback = callback;
+        mPath=path;
     }
 
     @Override
@@ -62,17 +63,15 @@ public class ListDriveTask extends AsyncTask<ArrayList<File>,Void,ArrayList<File
 
     private void extracted(ArrayList<File> files, FileMetadata metadata) {
         try {
-            File path = Environment.getExternalStoragePublicDirectory(
-                    "Comptes");
-            File file = new File(path, metadata.getName());
+            File file = new File(mPath, metadata.getName());
 
 //             Make sure the Downloads directory exists.
-            if (!path.exists()) {
-                if (!path.mkdirs()) {
-                    mException = new RuntimeException("Unable to create directory: " + path);
+            if (!mPath.exists()) {
+                if (!mPath.mkdirs()) {
+                    mException = new RuntimeException("Unable to create directory: " + mPath);
                 }
-            } else if (!path.isDirectory()) {
-                mException = new IllegalStateException("Download path is not a directory: " + path);
+            } else if (!mPath.isDirectory()) {
+                mException = new IllegalStateException("Download path is not a directory: " + mPath);
             }
 
             // Download the file.
