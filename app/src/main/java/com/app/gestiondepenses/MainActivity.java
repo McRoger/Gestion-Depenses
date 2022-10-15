@@ -272,6 +272,7 @@ public class MainActivity extends LoginActivity {
 
     // This callback is invoked when the Speech Recognizer returns.
 // This is where you process the intent and extract the speech text from the intent.
+    @SuppressLint("SetTextI18n")
     @Override
     protected void onActivityResult(int requestCode, int resultCode,
                                     Intent data) {
@@ -279,12 +280,20 @@ public class MainActivity extends LoginActivity {
             List<String> results = data.getStringArrayListExtra(
                     RecognizerIntent.EXTRA_RESULTS);
             String sentense=results.get(0);
-            Pattern pattern = Pattern.compile("(?<=\\bdépense\\s)(.+)co(.)*\\s(([\\d\\W,])+)", Pattern.CASE_INSENSITIVE);
+            Pattern pattern = Pattern.compile("(?<=\\bdépense\\s)(.+)co(...?)\\s(([\\d\\W,])+)", Pattern.CASE_INSENSITIVE);
             Matcher matcher = pattern.matcher(sentense);
             if(matcher.find()) {
                 nomDepense.setText(modificationMot(matcher.group(1)));
                 cout.setText(matcher.group(3));
                 createFile();
+            }else{
+                pattern = Pattern.compile("(?<=\\bdépense\\s)(.+)co(.)*\\s(-?|moins)(([\\d\\W,])+)", Pattern.CASE_INSENSITIVE);
+                matcher = pattern.matcher(sentense);
+                if(matcher.find()) {
+                    nomDepense.setText(modificationMot(matcher.group(1)));
+                    cout.setText("-" + matcher.group(4));
+                    createFile();
+                }
             }
             // Do something with spokenText.
         }
