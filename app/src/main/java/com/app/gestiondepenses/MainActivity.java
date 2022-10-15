@@ -1,21 +1,17 @@
 package com.app.gestiondepenses;
 
 
-import static android.os.storage.StorageManager.ACTION_MANAGE_STORAGE;
-
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
-import android.os.storage.StorageManager;
+import android.speech.RecognizerIntent;
 import android.util.Log;
 import android.util.SparseBooleanArray;
 import android.view.View;
@@ -25,15 +21,12 @@ import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ListView;
 import android.widget.ProgressBar;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.RequiresApi;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
-import com.app.dropbox.DropboxClient;
 import com.app.dropbox.DropboxClientFactory;
 import com.app.dropbox.LoginActivity;
 import com.app.interfaceGestion.Callback;
@@ -61,9 +54,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class MainActivity extends LoginActivity {
 
@@ -92,6 +86,8 @@ public class MainActivity extends LoginActivity {
 
     private ImageButton refreshListDrive = null;
 
+    private ImageButton voiceButton = null;
+
     private EditText nomDepense = null;
     private EditText cout = null;
 
@@ -105,6 +101,7 @@ public class MainActivity extends LoginActivity {
     private final android.os.Handler handler = new android.os.Handler();
 
 
+    @SuppressLint("MissingInflatedId")
     @RequiresApi(api = Build.VERSION_CODES.O)
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -150,6 +147,7 @@ public class MainActivity extends LoginActivity {
             progressBar = findViewById(R.id.progressBar);
             refreshListPhone = findViewById(R.id.refreshListPhone);
             refreshListDrive = findViewById(R.id.refreshListDrive);
+            voiceButton = findViewById(R.id.search_voice_btn);
 
 
         getFilesPhone();
@@ -254,7 +252,51 @@ public class MainActivity extends LoginActivity {
             }
             ).start());
 
+        voiceButton.setOnClickListener(view -> {
+            displaySpeechRecognizer();
+        });
 
+
+    }
+
+    private static final int SPEECH_REQUEST_CODE = 0;
+
+    // Create an intent that can start the Speech Recognizer activity
+    private void displaySpeechRecognizer() {
+        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+// This starts the activity and populates the intent with the speech text.
+        startActivityForResult(intent, SPEECH_REQUEST_CODE);
+    }
+
+    // This callback is invoked when the Speech Recognizer returns.
+// This is where you process the intent and extract the speech text from the intent.
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode,
+                                    Intent data) {
+        if (requestCode == SPEECH_REQUEST_CODE && resultCode == RESULT_OK) {
+            List<String> results = data.getStringArrayListExtra(
+                    RecognizerIntent.EXTRA_RESULTS);
+            String sentense=results.get(0);
+            Pattern pattern = Pattern.compile("(?<=\\bdépense\\s)(.+)co(.)*\\s(([\\d\\W,])+)", Pattern.CASE_INSENSITIVE);
+            Matcher matcher = pattern.matcher(sentense);
+            if(matcher.find()) {
+                nomDepense.setText(modificationMot(matcher.group(1)));
+                cout.setText(matcher.group(3));
+                createFile();
+            }
+            // Do something with spokenText.
+        }
+        super.onActivityResult(requestCode, resultCode, data);
+    }
+    private String modificationMot (String mot) {
+        Pattern pattern = Pattern.compile(".ntermarc(.)+", Pattern.CASE_INSENSITIVE);
+        Matcher matcher = pattern.matcher(mot);
+        if (matcher.find()) {
+            mot = "Intermarché";
+        }
+        return mot;
     }
 
     @Override

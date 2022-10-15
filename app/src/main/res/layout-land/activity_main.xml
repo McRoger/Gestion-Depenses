@@ -105,7 +105,12 @@
                             android:src="@android:drawable/arrow_down_float"
                             android:text="Export" />
                     </LinearLayout>
-
+                    <ImageButton
+                        android:id="@+id/search_voice_btn"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        app:srcCompat="@drawable/ic_micro" />
                 </LinearLayout>
 
             </ScrollView>
