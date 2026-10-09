@@ -1,13 +1,12 @@
 package com.app.tasks;
 
-import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
-import android.os.AsyncTask;
-import android.os.Environment;
+import android.util.Log;
 
 import com.app.interfaceGestion.Callback;
+import com.app.utils.AppExecutors;
 import com.dropbox.core.DbxException;
 import com.dropbox.core.v2.DbxClientV2;
 import com.dropbox.core.v2.files.FileMetadata;
@@ -17,77 +16,70 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.List;
 
 /**
- * Task to download a file from Dropbox and put it in the Downloads folder
+ * Task to download files from Dropbox asynchronously.
  */
-@SuppressLint("StaticFieldLeak")
-public
-class DownloadFileTask extends AsyncTask<ArrayList<File>,Object,ArrayList<File>> {
+public class DownloadFileTask {
 
     private final Context mContext;
     private final DbxClientV2 mDbxClient;
     private final Callback mCallback;
-    private Exception mException;
+    private final File mPath;
 
-    private File mPath;
-
-    public DownloadFileTask(Context context, DbxClientV2 dbxClient,File path, Callback callback) {
-        mContext = context;
+    public DownloadFileTask(Context context, DbxClientV2 dbxClient, File path, Callback callback) {
+        mContext = context != null ? context.getApplicationContext() : null;
         mDbxClient = dbxClient;
         mCallback = callback;
-        mPath=path;
+        mPath = path;
     }
 
-    @SafeVarargs
-    @Override
-    protected final ArrayList<File> doInBackground(ArrayList<File>... arrayLists) {
-        ArrayList<File> files = new ArrayList<>();
+    public void execute(final List<File> filesToDownload) {
+        AppExecutors.getInstance().networkIO().execute(() -> {
+            final ArrayList<File> downloadedFiles = new ArrayList<>();
+            Exception exception = null;
 
-        for (File file : arrayLists[0]) {
-            try {
+            if (mDbxClient != null && filesToDownload != null && mPath != null) {
+                if (!mPath.exists() && !mPath.mkdirs()) {
+                    Log.e("DownloadFileTask", "Unable to create directory: " + mPath);
+                }
 
-                FileMetadata metadata = (FileMetadata) mDbxClient.files().getMetadata("/" + file.getName());;
-                file = new File(mPath, metadata.getName());
+                for (File fileSpec : filesToDownload) {
+                    try {
+                        FileMetadata metadata = (FileMetadata) mDbxClient.files().getMetadata("/" + fileSpec.getName());
+                        File targetFile = new File(mPath, metadata.getName());
 
-//             Make sure the Downloads directory exists.
-                if (!mPath.exists()) {
-                    if (!mPath.mkdirs()) {
-                        mException = new RuntimeException("Unable to create directory: " + mPath);
+                        try (OutputStream outputStream = new FileOutputStream(targetFile)) {
+                            mDbxClient.files().download(metadata.getPathLower(), metadata.getRev())
+                                    .download(outputStream);
+                            mDbxClient.files().delete(metadata.getPathLower());
+                        }
+
+                        if (mContext != null) {
+                            Intent intent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
+                            intent.setData(Uri.fromFile(targetFile));
+                            mContext.sendBroadcast(intent);
+                        }
+
+                        downloadedFiles.add(targetFile);
+                    } catch (DbxException | IOException e) {
+                        Log.e("DownloadFileTask", "Error downloading file: " + fileSpec.getName(), e);
+                        exception = e;
                     }
-                } else if (!mPath.isDirectory()) {
-                    mException = new IllegalStateException("Download path is not a directory: " + mPath);
                 }
-
-                // Download the file.
-                try (OutputStream outputStream = new FileOutputStream(file)) {
-                    mDbxClient.files().download(metadata.getPathLower(), metadata.getRev())
-                            .download(outputStream);
-                    mDbxClient.files().delete(metadata.getPathLower());
-                }
-
-                // Tell android about the file
-                Intent intent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
-                intent.setData(Uri.fromFile(file));
-                mContext.sendBroadcast(intent);
-                files.add(file);
-
-            } catch (DbxException | IOException e) {
-                mException = e;
             }
-        }
 
-        return files;
-    }
-
-    @Override
-    protected void onPostExecute(ArrayList<File> result) {
-        super.onPostExecute(result);
-
-        if (mException != null) {
-            mCallback.onError(mException);
-        } else {
-            mCallback.onTaskComplete(result);
-        }
+            final Exception finalException = exception;
+            AppExecutors.getInstance().mainThread().execute(() -> {
+                if (mCallback != null) {
+                    if (finalException != null && downloadedFiles.isEmpty()) {
+                        mCallback.onError(finalException);
+                    } else {
+                        mCallback.onTaskComplete(downloadedFiles);
+                    }
+                }
+            });
+        });
     }
 }

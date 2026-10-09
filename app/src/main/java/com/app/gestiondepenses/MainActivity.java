@@ -1,15 +1,10 @@
 package com.app.gestiondepenses;
 
-
-import android.Manifest;
-import android.annotation.SuppressLint;
-import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
-import android.os.Build;
+import android.net.NetworkRequest;
 import android.os.Bundle;
 import android.speech.RecognizerIntent;
 import android.util.Log;
@@ -23,315 +18,302 @@ import android.widget.ListView;
 import android.widget.ProgressBar;
 import android.widget.Toast;
 
-import androidx.annotation.RequiresApi;
-import androidx.core.app.ActivityCompat;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
 import com.app.dropbox.DropboxClientFactory;
 import com.app.dropbox.LoginActivity;
 import com.app.interfaceGestion.Callback;
+import com.app.managers.ExpenseManager;
+import com.app.models.Expense;
 import com.app.tasks.DeleteFileTask;
 import com.app.tasks.DownloadFileTask;
 import com.app.tasks.GetCurrentAccountTask;
 import com.app.tasks.ListDriveTask;
 import com.app.tasks.UploadFileTask;
+import com.app.utils.AppExecutors;
 import com.dropbox.core.v2.users.FullAccount;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.sql.Timestamp;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ExecutionException;
-import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * Activité principale gérant la saisie, l'affichage local et la synchronisation Dropbox des dépenses.
+ */
 public class MainActivity extends LoginActivity {
 
-    private String ACCESS_TOKEN;
+    private static final String TAG = "MainActivity";
+    private static final int SPEECH_REQUEST_CODE = 100;
 
-    private static final Logger LOGGER = Logger.getLogger(MainActivity.class.getName());
+    // Dossier de stockage local sécurisé spécifique à l'application
+    private static File storagePath;
+    private ExpenseManager expenseManager;
 
-    private static final int REQUEST_PERMISSION = 1;
-    private static File PATH ;
+    // Composants de l'interface graphique (UI)
+    private ListView listFilePhone;
+    private ListView listFileDrive;
 
-    private ListView listFilePhone = null;
+    private Button creerDepense;
+    private Button supprimerDepensesPhone;
+    private ImageButton exportDepenses;
+    private ImageButton importDepenses;
+    private Button supprimerDepensesDrive;
+    private ImageButton refreshListPhone;
+    private ImageButton refreshListDrive;
+    private ImageButton voiceButton;
 
-    private ListView listFileDrive = null;
+    private EditText nomDepense;
+    private EditText cout;
+    private ProgressBar progressBar;
 
-    private Button creerDepense = null;
-
-    private Button supprimerDepensesPhone = null;
-
-    private ImageButton exportDepenses = null;
-
-    private ImageButton importDepenses = null;
-
-    private Button supprimerDepensesDrive = null;
-
-    private ImageButton refreshListPhone = null;
-
-    private ImageButton refreshListDrive = null;
-
-    private ImageButton voiceButton = null;
-
-    private EditText nomDepense = null;
-    private EditText cout = null;
-
+    // Cartes associant le fichier physique (.txt) à son texte d'affichage ("Nom | Coût €")
     private final HashMap<File, String> mapFilePhone = new HashMap<>();
     private final HashMap<File, String> mapFileDrive = new HashMap<>();
 
-    private Boolean accesInternet = true;
-    private Boolean isCliquable = true;
+    // États du réseau et d'interaction utilisateur
+    private boolean accesInternet = true;
+    private boolean isCliquable = true;
 
-    private ProgressBar progressBar;
-    private final android.os.Handler handler = new android.os.Handler();
+    // Gestionnaire réactif de l'état du réseau (remplace l'ancienne boucle infinie de 100ms)
+    private ConnectivityManager connectivityManager;
+    private ConnectivityManager.NetworkCallback networkCallback;
 
-
-    @SuppressLint("MissingInflatedId")
-    @RequiresApi(api = Build.VERSION_CODES.O)
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        Thread thread = new Thread() {
 
-            @Override
-            public void run() {
-                try {
-                    while (!isInterrupted()) {
-                        Thread.sleep(100);
-                        runOnUiThread(MainActivity.this::checkInternetAccess);
-                    }
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    Logger.getLogger(Objects.requireNonNull(e.getMessage()));
-                }
-            }
-        };
-
-        thread.start();
-
-        PATH = ContextCompat.getExternalFilesDirs(getApplicationContext(), null)[0];
+        // Initialisation du dossier de stockage interne/externe sans dépendre de permissions obsolètes
+        File[] externalFilesDirs = ContextCompat.getExternalFilesDirs(getApplicationContext(), null);
+        storagePath = (externalFilesDirs != null && externalFilesDirs.length > 0) ? externalFilesDirs[0] : getFilesDir();
+        expenseManager = new ExpenseManager(storagePath);
 
         setContentView(R.layout.activity_main);
 
+        // Liaison des vues XML aux variables Java
+        nomDepense = findViewById(R.id.nomDepense);
+        cout = findViewById(R.id.cout);
 
-            ACCESS_TOKEN = "1";
+        listFilePhone = findViewById(R.id.listViewPhone);
+        listFileDrive = findViewById(R.id.listViewDrive);
 
-            nomDepense = findViewById(R.id.nomDepense);
+        creerDepense = findViewById(R.id.creerDepense);
+        supprimerDepensesPhone = findViewById(R.id.supprimerDepenses);
+        exportDepenses = findViewById(R.id.exportDepense);
+        importDepenses = findViewById(R.id.importDepense);
+        supprimerDepensesDrive = findViewById(R.id.supprimerDepensesDrive);
+        progressBar = findViewById(R.id.progressBar);
+        refreshListPhone = findViewById(R.id.refreshListPhone);
+        refreshListDrive = findViewById(R.id.refreshListDrive);
+        voiceButton = findViewById(R.id.search_voice_btn);
 
-            cout = findViewById(R.id.cout);
+        // Configuration des événements clics et de l'écouteur de réseau
+        setupListeners();
+        setupNetworkCallback();
 
-            listFilePhone = findViewById(R.id.listViewPhone);
-
-            supprimerDepensesPhone = findViewById(R.id.supprimerDepenses);
-            creerDepense = this.findViewById(R.id.creerDepense);
-
-            exportDepenses = findViewById(R.id.exportDepense);
-            importDepenses = findViewById(R.id.importDepense);
-            supprimerDepensesDrive = findViewById(R.id.supprimerDepensesDrive);
-            listFileDrive = findViewById(R.id.listViewDrive);
-            progressBar = findViewById(R.id.progressBar);
-            refreshListPhone = findViewById(R.id.refreshListPhone);
-            refreshListDrive = findViewById(R.id.refreshListDrive);
-            voiceButton = findViewById(R.id.search_voice_btn);
-
-
+        // Chargement initial des dépenses locales
         getFilesPhone();
 
-        if(null!=DropboxClientFactory.getClient()) {
-                getFilesDrive();
-            }
-            creerDepense.setOnClickListener(view -> {
-                isCliquable = false;
-                createFile();
-                isCliquable = true;
-            });
-
-            exportDepenses.setOnClickListener(view -> new Thread(() -> {
-                isCliquable = false;
-
-                MainActivity.this.handler.post(() -> progressBar.setVisibility(View.VISIBLE));
-                upload();
-                MainActivity.this.handler.post(() -> {
-                    progressBar.setVisibility(View.GONE);
-                    isCliquable = true;
-                });
-
-            }
-            ).start());
-
-            supprimerDepensesPhone.setOnClickListener(v -> new Thread(() -> {
-
-                MainActivity.this.handler.post(() -> {
-                    isCliquable = false;
-
-                    progressBar.setVisibility(View.VISIBLE);
-                });
-                deletePhone();
-
-                MainActivity.this.handler.post(() -> {
-                    progressBar.setVisibility(View.GONE);
-                    isCliquable = true;
-                    updateDataPhone();
-                    Toast.makeText(MainActivity.this, "Les dépenses sélectionnées ont été supprimées de l'appareil !", Toast.LENGTH_LONG).show();
-                });
-
-            }
-            ).start());
-
-
-            importDepenses.setOnClickListener(view -> new Thread(() -> {
-
-
-                MainActivity.this.handler.post(() -> {
-                    isCliquable = false;
-
-                    progressBar.setVisibility(View.VISIBLE);
-                });
-                download();
-                MainActivity.this.handler.post(() -> {
-                    progressBar.setVisibility(View.GONE);
-                    isCliquable = true;
-
-                    Toast.makeText(MainActivity.this, "Les dépenses sélectionnées ont été importées dans l'appareil !", Toast.LENGTH_LONG).show();
-                });
-
-            }
-            ).start());
-
-            supprimerDepensesDrive.setOnClickListener(v -> new Thread(() -> {
-
-
-                MainActivity.this.handler.post(() -> {
-                    isCliquable = false;
-
-                    progressBar.setVisibility(View.VISIBLE);
-                });
-                deleteDrive();
-                MainActivity.this.handler.post(() -> {
-                    progressBar.setVisibility(View.GONE);
-                    isCliquable = true;
-
-                    Toast.makeText(MainActivity.this, "Les dépenses sélectionnées ont été supprimées du drive !", Toast.LENGTH_LONG).show();
-                });
-
-            }
-            ).start());
-            refreshListPhone.setOnClickListener(view -> {
-                isCliquable = false;
-                getFilesPhone();
-                isCliquable = true;
-            });
-
-            refreshListDrive.setOnClickListener(view -> new Thread(() -> {
-
-                MainActivity.this.handler.post(() -> {
-                    isCliquable = false;
-                    progressBar.setVisibility(View.VISIBLE);
-                });
-                getFilesDrive();
-                MainActivity.this.handler.post(() -> {
-                    progressBar.setVisibility(View.GONE);
-                    isCliquable = true;
-                });
-
-            }
-            ).start());
-
-        voiceButton.setOnClickListener(view -> {
-            displaySpeechRecognizer();
-        });
-
-
+        // Chargement des dépenses distantes Dropbox si le client est authentifié
+        if (DropboxClientFactory.getClient() != null) {
+            getFilesDrive();
+        }
     }
 
-    private static final int SPEECH_REQUEST_CODE = 0;
+    /**
+     * Attache les écouteurs d'événements aux boutons et aux listes.
+     */
+    private void setupListeners() {
+        creerDepense.setOnClickListener(view -> createFile());
+        exportDepenses.setOnClickListener(view -> upload());
+        supprimerDepensesPhone.setOnClickListener(v -> deletePhone());
+        importDepenses.setOnClickListener(view -> download());
+        supprimerDepensesDrive.setOnClickListener(view -> deleteDrive());
 
-    // Create an intent that can start the Speech Recognizer activity
+        refreshListPhone.setOnClickListener(view -> getFilesPhone());
+        refreshListDrive.setOnClickListener(view -> getFilesDrive());
+
+        voiceButton.setOnClickListener(view -> displaySpeechRecognizer());
+
+        // Mise à jour automatique de l'état des boutons lors de la sélection/décochage d'éléments
+        if (listFilePhone != null) {
+            listFilePhone.setOnItemClickListener((parent, view, position, id) -> updateButtonStates());
+        }
+        if (listFileDrive != null) {
+            listFileDrive.setOnItemClickListener((parent, view, position, id) -> updateButtonStates());
+        }
+    }
+
+    /**
+     * Configure un NetworkCallback pour être notifié des changements de connexion
+     * (évite de consommer la batterie avec une boucle de vérification constante).
+     */
+    private void setupNetworkCallback() {
+        connectivityManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+        if (connectivityManager == null) return;
+
+        networkCallback = new ConnectivityManager.NetworkCallback() {
+            @Override
+            public void onAvailable(@NonNull Network network) {
+                // Exécution sur le thread principal pour mettre à jour l'UI
+                AppExecutors.getInstance().mainThread().execute(() -> {
+                    boolean previousState = accesInternet;
+                    accesInternet = true;
+                    updateButtonStates();
+                    // Si la connexion vient de revenir, rafraîchir les listes
+                    if (!previousState && DropboxClientFactory.getClient() != null) {
+                        getFilesDrive();
+                        getFilesPhone();
+                    }
+                });
+            }
+
+            @Override
+            public void onLost(@NonNull Network network) {
+                AppExecutors.getInstance().mainThread().execute(() -> {
+                    accesInternet = isNetworkAvailable();
+                    updateButtonStates();
+                });
+            }
+        };
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        // Enregistrement de l'écouteur réseau lors du démarrage de l'activité
+        if (connectivityManager != null && networkCallback != null) {
+            NetworkRequest request = new NetworkRequest.Builder()
+                    .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                    .build();
+            try {
+                connectivityManager.registerNetworkCallback(request, networkCallback);
+            } catch (Exception e) {
+                Log.e(TAG, "Erreur lors de l'enregistrement du NetworkCallback", e);
+            }
+        }
+        accesInternet = isNetworkAvailable();
+        updateButtonStates();
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        // Désinscription de l'écouteur réseau pour éviter toute fuite de mémoire
+        if (connectivityManager != null && networkCallback != null) {
+            try {
+                connectivityManager.unregisterNetworkCallback(networkCallback);
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    /**
+     * Teste si un réseau actif dispose d'une connexion internet utilisable.
+     */
+    private boolean isNetworkAvailable() {
+        if (connectivityManager == null) return false;
+        Network nw = connectivityManager.getActiveNetwork();
+        if (nw == null) return false;
+        NetworkCapabilities actNw = connectivityManager.getNetworkCapabilities(nw);
+        return actNw != null && (actNw.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                actNw.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
+                actNw.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) ||
+                actNw.hasTransport(NetworkCapabilities.TRANSPORT_BLUETOOTH));
+    }
+
+    /**
+     * Déclenche l'assistant de reconnaissance vocale Android.
+     */
     private void displaySpeechRecognizer() {
         Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
-        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-// This starts the activity and populates the intent with the speech text.
-        startActivityForResult(intent, SPEECH_REQUEST_CODE);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        try {
+            startActivityForResult(intent, SPEECH_REQUEST_CODE);
+        } catch (Exception e) {
+            Toast.makeText(this, "Reconnaissance vocale non disponible", Toast.LENGTH_SHORT).show();
+        }
     }
 
-    // This callback is invoked when the Speech Recognizer returns.
-// This is where you process the intent and extract the speech text from the intent.
-    @SuppressLint("SetTextI18n")
+    /**
+     * Traite le résultat retourné par la reconnaissance vocale.
+     */
     @Override
-    protected void onActivityResult(int requestCode, int resultCode,
-                                    Intent data) {
-        if (requestCode == SPEECH_REQUEST_CODE && resultCode == RESULT_OK) {
-            List<String> results = data.getStringArrayListExtra(
-                    RecognizerIntent.EXTRA_RESULTS);
-            String sentense=results.get(0);
-            Pattern pattern = Pattern.compile("(?<=\\bdépense\\s)(.+)co(...?)\\s(([\\d\\W,])+)", Pattern.CASE_INSENSITIVE);
-            Matcher matcher = pattern.matcher(sentense);
-            if(matcher.find()) {
-                nomDepense.setText(modificationMot(matcher.group(1)));
-                cout.setText(matcher.group(3));
-                createFile();
-            }else{
-                pattern = Pattern.compile("(?<=\\bdépense\\s)(.+)co(.)*\\s(-?|moins)(([\\d\\W,])+)", Pattern.CASE_INSENSITIVE);
-                matcher = pattern.matcher(sentense);
-                if(matcher.find()) {
-                    nomDepense.setText(modificationMot(matcher.group(1)));
-                    cout.setText("-" + matcher.group(4));
-                    createFile();
-                }
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        if (requestCode == SPEECH_REQUEST_CODE && resultCode == RESULT_OK && data != null) {
+            List<String> results = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+            if (results != null && !results.isEmpty()) {
+                String sentence = results.get(0);
+                parseAndApplyVoiceText(sentence);
             }
-            // Do something with spokenText.
         }
         super.onActivityResult(requestCode, resultCode, data);
     }
-    private String modificationMot (String mot) {
+
+    /**
+     * Extrait le nom du commerce et le coût à partir d'une phrase dictée (ex: "dépense Courses coûte 25,50").
+     */
+    private void parseAndApplyVoiceText(String sentence) {
+        Pattern pattern = Pattern.compile("(?<=\\bdépense\\s)(.+)co(...?)\\s(([\\d\\W,])+)", Pattern.CASE_INSENSITIVE);
+        Matcher matcher = pattern.matcher(sentence);
+        if (matcher.find()) {
+            nomDepense.setText(modificationMot(matcher.group(1)));
+            cout.setText(matcher.group(3));
+            createFile();
+        } else {
+            pattern = Pattern.compile("(?<=\\bdépense\\s)(.+)co(.)*\\s(-?|moins)(([\\d\\W,])+)", Pattern.CASE_INSENSITIVE);
+            matcher = pattern.matcher(sentence);
+            if (matcher.find()) {
+                nomDepense.setText(modificationMot(matcher.group(1)));
+                String negValue = "-" + matcher.group(4);
+                cout.setText(negValue);
+                createFile();
+            }
+        }
+    }
+
+    /**
+     * Corrige automatiquement certaines erreurs courantes de dictée (ex: "Intermarché").
+     */
+    private String modificationMot(String mot) {
+        if (mot == null) return "";
         Pattern pattern = Pattern.compile(".ntermarc(.)+", Pattern.CASE_INSENSITIVE);
         Matcher matcher = pattern.matcher(mot);
         if (matcher.find()) {
-            mot = "Intermarché";
+            return "Intermarché";
         }
-        return mot;
+        return mot.trim();
     }
 
     @Override
     protected void loadData() {
+        if (DropboxClientFactory.getClient() == null) return;
         new GetCurrentAccountTask(DropboxClientFactory.getClient(), new GetCurrentAccountTask.Callback() {
             @Override
             public void onComplete(FullAccount result) {
+                Log.d(TAG, "Compte chargé: " + (result != null ? result.getName().getDisplayName() : "inconnu"));
             }
 
             @Override
             public void onError(Exception e) {
-                Log.e(getClass().getName(), "Failed to get account details.", e);
+                Log.e(TAG, "Échec lors de la récupération du compte Dropbox.", e);
             }
         }).execute();
     }
 
     /**
-     * Vérifie si les items sont sélectionnés dans les listes
-     *
-     * @param listViewP
-     * @return
+     * Vérifie si au moins un élément est coché dans une ListView.
      */
-    private boolean areItemsChecked(ListView listViewP) {
-
-        SparseBooleanArray checkItem = listViewP.getCheckedItemPositions();
-
+    private boolean areItemsChecked(ListView listView) {
+        if (listView == null) return false;
+        SparseBooleanArray checkItem = listView.getCheckedItemPositions();
         if (checkItem != null) {
             for (int i = 0; i < checkItem.size(); i++) {
                 if (checkItem.valueAt(i)) {
@@ -343,538 +325,330 @@ public class MainActivity extends LoginActivity {
     }
 
     /**
-     * Suppression de fichiers présent dans l'appareil
+     * Active/désactive l'indicateur de chargement et verrouille l'interface durant une tâche d'arrière-plan.
      */
-    @RequiresApi(api = Build.VERSION_CODES.O)
-    private void deletePhone() {
-        if (ACCESS_TOKEN == null) return;
-
-        SparseBooleanArray checkItem = listFilePhone.getCheckedItemPositions();
-
-        ArrayList<File> files = new ArrayList<>();
-
-        if (checkItem != null) {
-            for (int i = 0; i < checkItem.size(); i++) {
-                if (checkItem.valueAt(i)) {
-                    String item = listFilePhone.getAdapter().getItem(
-                            checkItem.keyAt(i)).toString();
-
-                    files.add(getFileValue(mapFilePhone, item, files));
-                }
-            }
+    private void setLoadingState(boolean loading) {
+        isCliquable = !loading;
+        if (progressBar != null) {
+            progressBar.setVisibility(loading ? View.VISIBLE : View.GONE);
         }
-
-        if (!files.isEmpty()) {
-            for (File file : files) {
-                removeListPhone(file);
-            }
-        }
-
+        updateButtonStates();
     }
 
     /**
-     * Suppression de dépenses présentent sur le drive
+     * Met à jour dynamiquement l'état activé/désactivé des boutons en fonction du réseau,
+     * de l'état de chargement et des éléments cochés.
      */
-    private void deleteDrive() {
-        if (ACCESS_TOKEN == null) return;
-        SparseBooleanArray checkItem = listFileDrive.getCheckedItemPositions();
-        ArrayList<File> files = new ArrayList<>();
-
-        if (checkItem != null) {
-            for (int i = 0; i < checkItem.size(); i++) {
-                if (checkItem.valueAt(i)) {
-                    String item = listFileDrive.getAdapter().getItem(
-                            checkItem.keyAt(i)).toString();
-
-                    if (null != getFileValue(mapFileDrive, item, files))
-                        files.add(getFileValue(mapFileDrive, item, files));
-                }
-            }
-        }
-
-        try {
-
-            DeleteFileTask deleteFileTask = new DeleteFileTask(DropboxClientFactory.getClient(), new Callback() {
-                @Override
-                public void onTaskComplete(ArrayList<File> result) {
-                    for (File file : result) {
-                        removeListDrive(file);
-                    }
-                    updateDataDrive();
-                }
-
-                @Override
-                public void onError(Exception e) {
-                    Logger.getLogger(Objects.requireNonNull(e.getMessage()));
-                }
-            });
-            deleteFileTask.execute(files).get();
-
-        } catch (ExecutionException | InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-
-    }
-
-    /**
-     * Ajout du fichier texte de l'appareil dans la map
-     *
-     * @param file Fichier txt
-     */
-    @RequiresApi(api = Build.VERSION_CODES.O)
-    private void addListPhone(File file) {
-        if (readFile(file) != null) {
-            mapFilePhone.put(file, readFile(file));
-        } else {
-            deleteFolder(file);
-        }
-    }
-
-    /**
-     * Suppression du fichier txt de l'appareil de la map
-     *
-     * @param file Fichier txt
-     */
-    @RequiresApi(api = Build.VERSION_CODES.O)
-    private void removeListPhone(File file) {
-        mapFilePhone.remove(file);
-
-        MainActivity.deleteFolder(file);
-
-    }
-
-    /**
-     * Ajout d'un fichier présent sur le drive dans la map
-     *
-     * @param file Fichier txt
-     */
-    private void addListDrive(File file) {
-        if (readFile(file) != null) {
-            mapFileDrive.put(file, readFile(file));
-        }
-    }
-
-    /**
-     * Supprimer le fichier de la map drive
-     *
-     * @param file Fichier txt
-     */
-    private void removeListDrive(File file) {
-        mapFileDrive.remove(file);
-    }
-
-    /**
-     * Exporte la dépense vers le drive
-     */
-    private void upload() {
-        if (ACCESS_TOKEN == null) return;
-
-
-        SparseBooleanArray checkItem = listFilePhone.getCheckedItemPositions();
-
-        ArrayList<File> files = new ArrayList<>();
-
-        if (checkItem != null) {
-            for (int i = 0; i < checkItem.size(); i++) {
-                if (checkItem.valueAt(i)) {
-                    String item = listFilePhone.getAdapter().getItem(
-                            checkItem.keyAt(i)).toString();
-
-                    files.add(getFileValue(mapFilePhone, item, files));
-                }
-            }
-        }
-
-        if (!files.isEmpty()) {
-
-            try {
-                new UploadFileTask(DropboxClientFactory.getClient(), new Callback() {
-                    @RequiresApi(api = Build.VERSION_CODES.O)
-                    @Override
-                    public void onTaskComplete(ArrayList<File> result) {
-                        for (File file : result) {
-                            addListDrive(file);
-                            removeListPhone(file);
-                        }
-                        updateDataPhone();
-                        updateDataDrive();
-                    }
-
-                    @Override
-                    public void onError(Exception e) {
-                        Logger.getLogger(Objects.requireNonNull(e.getMessage()));
-                    }
-                }).execute(files).get();
-
-            } catch (ExecutionException | InterruptedException e) {
-                Thread.currentThread().interrupt();
-                e.printStackTrace();
-            }
-        }
-    }
-
-    /**
-     * Importe les dépenses sur l'appareil
-     */
-    private void download() {
-        if (ACCESS_TOKEN == null) return;
-
-        SparseBooleanArray checkItem = listFileDrive.getCheckedItemPositions();
-
-        ArrayList<File> files = new ArrayList<>();
-
-        if (checkItem != null) {
-            for (int i = 0; i < checkItem.size(); i++) {
-                if (checkItem.valueAt(i)) {
-                    String item = listFileDrive.getAdapter().getItem(
-                            checkItem.keyAt(i)).toString();
-
-                    if (null != getFileValue(mapFileDrive, item, files))
-                        files.add(getFileValue(mapFileDrive, item, files));
-                }
-            }
-        }
-
-
-        try {
-            DownloadFileTask downloadFileTask = new DownloadFileTask(getApplicationContext(), DropboxClientFactory.getClient(), PATH, new Callback() {
-                @RequiresApi(api = Build.VERSION_CODES.O)
-                @Override
-                public void onTaskComplete(ArrayList<File> result) {
-                    for (File file : result) {
-                        removeListDrive(file);
-                        if (!"".equals(readFile(file))) {
-                            addListPhone(file);
-                        } else {
-                            deleteFolder(file);
-                        }
-                    }
-                    updateDataPhone();
-                    updateDataDrive();
-                }
-
-                @Override
-                public void onError(Exception e) {
-                    Logger.getLogger(Objects.requireNonNull(e.getMessage()));
-                }
-            });
-            downloadFileTask.execute(files).get();
-
-        } catch (ExecutionException | InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-
-
-    }
-
-    /**
-     * Récupère la clé de la map en fonction de la value
-     *
-     * @param map
-     * @param value
-     * @param files
-     * @param <T>
-     * @param <E>
-     * @return
-     */
-    public static <T, E> File getFileValue(Map<T, E> map, E value, List<T> files) {
-
-        File file = null;
-        for (Map.Entry<T, E> entry : map.entrySet()) {
-            if (Objects.equals(value, entry.getValue()) && !files.contains(entry.getKey())) {
-                file = (File) entry.getKey();
-                break;
-            }
-        }
-        return file;
-    }
-
-
-    /**
-     * Supprime un fichier
-     *
-     * @param folder Fichier
-     */
-    @RequiresApi(api = Build.VERSION_CODES.O)
-    public static void deleteFolder(File folder) {
-        File[] files = folder.listFiles();
-        try {
-            if (files != null) { //some JVMs return null for empty dirs
-
-                for (File f : files) {
-                    if (f.isDirectory()) {
-                        deleteFolder(f);
-                    } else {
-
-                        Files.delete(f.toPath());
-
-                    }
-                }
-            }
-            Files.delete(folder.toPath());
-        } catch (IOException e) {
-            Logger.getLogger(Objects.requireNonNull(e.getMessage()));
-        }
-
-    }
-
-
-    /**
-     * Création d'une dépense
-     */
-    private void createFile() {
-
-        if (!nomDepense.getText().toString().isEmpty() && !cout.getText().toString().isEmpty()) {
-            List<String> lines = Collections.singletonList(nomDepense.getText().toString() + "|" + cout.getText().toString());
-            Path pathFile;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                String nomFichier = new Timestamp(System.currentTimeMillis()).toString();
-                pathFile = Paths.get(PATH+ "/" + nomFichier.replace(":", " ") + ".txt");
-
-                try {
-                    Files.write(pathFile, lines, StandardCharsets.UTF_8);
-                    File file = pathFile.toFile();
-                    addListPhone(file);
-                    updateDataPhone();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-
-
-            Toast.makeText(MainActivity.this, "Une dépense a été créée !", Toast.LENGTH_LONG).show();
-            nomDepense.setText("");
-            cout.setText("");
-        }
-
-    }
-
-    /**
-     * Récupère tous les fichiers présents sur l'appareil
-     */
-    @RequiresApi(api = Build.VERSION_CODES.O)
-    private void getFilesPhone() {
-
-        Logger.getLogger("Permission granted");
-
-        File[] files = PATH.listFiles();
-
-        mapFilePhone.clear();
-
-        if (files != null)
-            Arrays.stream(files).forEach(this::addListPhone);
-
-        updateDataPhone();
-    }
-
-
-    /**
-     * Récupère et liste tous les fichiers présents sur le drive
-     */
-    private void getFilesDrive() {
-        mapFileDrive.clear();
-
-        try {
-
-            ListDriveTask listDriveTask = new ListDriveTask(DropboxClientFactory.getClient(), PATH, new Callback() {
-                @RequiresApi(api = Build.VERSION_CODES.O)
-                @Override
-                public void onTaskComplete(ArrayList<File> result) {
-                    for (File file : result) {
-                        if (readFile(file) != null) {
-                            addListDrive(file);
-                        }
-                        deleteFolder(file);
-                    }
-                    updateDataDrive();
-                }
-
-                @Override
-                public void onError(Exception e) {
-                    Logger.getLogger(e.getMessage());
-                }
-            });
-            listDriveTask.execute().get();
-
-        } catch (ExecutionException | InterruptedException e) {
-            Thread.currentThread().interrupt();
-            e.printStackTrace();
-        }
-    }
-
-    /**
-     * Lit le fichier txt
-     *
-     * @param fichier Fichier txt
-     * @return
-     */
-    public static String readFile(File fichier) {
-        String line;
-        List<String> listeLignes = new ArrayList<>();
-
-        // FileReader reads text files in the default encoding.
-        // Always wrap FileReader in BufferedReader.
-        try (FileReader fileReader =
-                     new FileReader(fichier); BufferedReader bufferedReader =
-                     new BufferedReader(fileReader)) {
-
-            while ((line = bufferedReader.readLine()) != null) {
-                listeLignes.add(line);
-            }
-
-        } catch (FileNotFoundException ex) {
-            Logger.getLogger("Impossible d'ouvrir le fichier " + fichier);
-        } catch (IOException ex) {
-            Logger.getLogger("Impossible de lire le fichier " + fichier);
-        }
-
-        if (!listeLignes.isEmpty()) {
-            return listeLignes.get(0);
-        } else {
-            return null;
-        }
-    }
-
-
-    /**
-     * Met à jour la liste affichée des dépenses de l'appareil
-     */
-    public void updateDataPhone() {
-
-        ArrayAdapter<String> mAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_multiple_choice, new ArrayList<>(mapFilePhone.values()));
-
-        listFilePhone.setAdapter(mAdapter);
-    }
-
-
-    /**
-     * Met à jour la liste affichée des dépenses du drive
-     */
-    public void updateDataDrive() {
-
-        ArrayAdapter<String> mAdapterDrive = new ArrayAdapter<>(this, android.R.layout.simple_list_item_multiple_choice, new ArrayList<>(mapFileDrive.values()));
-
-        listFileDrive.setAdapter(mAdapterDrive);
-    }
-
-    /**
-     * Vérifie l'existence du token
-     *
-     * @return
-     */
-    private boolean tokenExists() {
-        SharedPreferences prefs = getSharedPreferences("com.app.gestiondepenses", Context.MODE_PRIVATE);
-        String accessToken = prefs.getString("access-token", null);
-        return accessToken != null;
-    }
-
-    /**
-     * Vérifie si un token est déjà disponible sur l'appareil
-     *
-     * @return
-     */
-    private String retrieveAccessToken() {
-        //check if ACCESS_TOKEN is stored on previous app launches
-        SharedPreferences prefs = getSharedPreferences("com.app.gestiondepenses", Context.MODE_PRIVATE);
-        String accessToken = prefs.getString("access-token", null);
-        if (accessToken == null) {
-            Log.d("AccessToken Status", "No token found");
-            return null;
-        } else {
-            //accessToken already exists
-            Log.d("AccessToken Status", "Token exists");
-            return accessToken;
-        }
-    }
-
-    /**
-     * Demande l'autorisation pour écrire sur l'appareil
-     */
-    private void requestPermission() {
-        ActivityCompat.requestPermissions(
-                this,
-                new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
-                REQUEST_PERMISSION);
-    }
-
-    /**
-     * Indique si le réseau internet est disponible
-     *
-     * @return True si un accès réseau est disponible
-     */
-    private boolean isNetworkAvailable() {
-        ConnectivityManager connectivityManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
-        Network nw = connectivityManager.getActiveNetwork();
-        if (nw == null) return false;
-        NetworkCapabilities actNw = connectivityManager.getNetworkCapabilities(nw);
-        return actNw != null && (actNw.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || actNw.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) || actNw.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) || actNw.hasTransport(NetworkCapabilities.TRANSPORT_BLUETOOTH));
-    }
-
-
-    /**
-     * Donne la possibilité de cliquer sur les boutons en fonctions du réseau et de la contenance des listes
-     *
-     * @return
-     */
-    @RequiresApi(api = Build.VERSION_CODES.O)
-    public void checkInternetAccess() {
-
-        if (!isNetworkAvailable()) {
-            accesInternet = false;
-        } else {
-            if (!accesInternet) {
-                getFilesDrive();
-                getFilesPhone();
-            }
-            accesInternet = true;
-
-        }
+    public void updateButtonStates() {
+        boolean hasNetwork = accesInternet;
+        boolean canClick = isCliquable;
 
         if (exportDepenses != null) {
-            exportDepenses.setEnabled(accesInternet && areItemsChecked(listFilePhone) && isCliquable);
-
+            exportDepenses.setEnabled(hasNetwork && canClick && areItemsChecked(listFilePhone));
         }
-
         if (importDepenses != null) {
-            importDepenses.setEnabled(accesInternet && areItemsChecked(listFileDrive) && isCliquable);
-
+            importDepenses.setEnabled(hasNetwork && canClick && areItemsChecked(listFileDrive));
         }
-
         if (supprimerDepensesDrive != null) {
-            supprimerDepensesDrive.setEnabled(accesInternet && areItemsChecked(listFileDrive) && isCliquable);
-
+            supprimerDepensesDrive.setEnabled(hasNetwork && canClick && areItemsChecked(listFileDrive));
         }
-
         if (supprimerDepensesPhone != null) {
-            supprimerDepensesPhone.setEnabled(areItemsChecked(listFilePhone) && isCliquable);
-
+            supprimerDepensesPhone.setEnabled(canClick && areItemsChecked(listFilePhone));
         }
-
         if (listFileDrive != null) {
-            listFileDrive.setEnabled(accesInternet && isCliquable);
-
+            listFileDrive.setEnabled(hasNetwork && canClick);
         }
-
         if (listFilePhone != null) {
-            listFilePhone.setEnabled(isCliquable);
-
+            listFilePhone.setEnabled(canClick);
         }
-
         if (refreshListDrive != null) {
-            refreshListDrive.setEnabled(accesInternet && isCliquable);
-
+            refreshListDrive.setEnabled(hasNetwork && canClick);
         }
-
         if (refreshListPhone != null) {
-            refreshListPhone.setEnabled(isCliquable);
-
+            refreshListPhone.setEnabled(canClick);
         }
-
-        if (null != creerDepense) {
-            creerDepense.setEnabled(isCliquable);
+        if (creerDepense != null) {
+            creerDepense.setEnabled(canClick);
         }
-
     }
 
-}
+    /**
+     * Récupère la liste des fichiers correspondant aux éléments actuellement cochés dans une ListView.
+     */
+    private List<File> getCheckedFiles(ListView listView, Map<File, String> map) {
+        List<File> files = new ArrayList<>();
+        if (listView == null || map == null) return files;
 
+        SparseBooleanArray checked = listView.getCheckedItemPositions();
+        if (checked != null) {
+            for (int i = 0; i < checked.size(); i++) {
+                if (checked.valueAt(i)) {
+                    Object itemObj = listView.getAdapter().getItem(checked.keyAt(i));
+                    if (itemObj != null) {
+                        String itemText = itemObj.toString();
+                        File match = getFileValue(map, itemText, files);
+                        if (match != null) {
+                            files.add(match);
+                        }
+                    }
+                }
+            }
+        }
+        return files;
+    }
+
+    /**
+     * Recherche la clé (File) dans une Map à partir de sa valeur affichée.
+     */
+    public static <T, E> File getFileValue(Map<T, E> map, E value, List<T> files) {
+        if (map == null || value == null) return null;
+        for (Map.Entry<T, E> entry : map.entrySet()) {
+            if (Objects.equals(value, entry.getValue()) && (files == null || !files.contains(entry.getKey()))) {
+                return (File) entry.getKey();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Crée une nouvelle dépense locale de manière asynchrone sans bloquer l'IHM.
+     */
+    private void createFile() {
+        final String nameStr = nomDepense.getText().toString().trim();
+        final String coutStr = cout.getText().toString().trim();
+
+        if (nameStr.isEmpty() || coutStr.isEmpty()) {
+            Toast.makeText(this, "Veuillez remplir le nom et le coût", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        setLoadingState(true);
+        // Exécution en arrière-plan sur le pool de threads de stockage
+        AppExecutors.getInstance().diskIO().execute(() -> {
+            try {
+                expenseManager.createExpense(nameStr, coutStr);
+                // Retour sur le thread principal pour mettre à jour l'IHM
+                AppExecutors.getInstance().mainThread().execute(() -> {
+                    nomDepense.setText("");
+                    cout.setText("");
+                    setLoadingState(false);
+                    getFilesPhone();
+                    Toast.makeText(MainActivity.this, "Une dépense a été créée !", Toast.LENGTH_SHORT).show();
+                });
+            } catch (IOException e) {
+                Log.e(TAG, "Erreur lors de la création du fichier de dépense", e);
+                AppExecutors.getInstance().mainThread().execute(() -> {
+                    setLoadingState(false);
+                    Toast.makeText(MainActivity.this, "Erreur lors de la création de la dépense", Toast.LENGTH_SHORT).show();
+                });
+            }
+        });
+    }
+
+    /**
+     * Charge de manière asynchrone les dépenses enregistrées localement sur le téléphone.
+     */
+    private void getFilesPhone() {
+        setLoadingState(true);
+        AppExecutors.getInstance().diskIO().execute(() -> {
+            List<Expense> expenses = expenseManager.getLocalExpenses();
+            AppExecutors.getInstance().mainThread().execute(() -> {
+                mapFilePhone.clear();
+                for (Expense expense : expenses) {
+                    mapFilePhone.put(expense.getFile(), expense.getDisplayText());
+                }
+                updateDataPhone();
+                setLoadingState(false);
+            });
+        });
+    }
+
+    /**
+     * Récupère la liste des dépenses stockées sur le compte Dropbox.
+     */
+    private void getFilesDrive() {
+        if (DropboxClientFactory.getClient() == null) {
+            updateDataDrive();
+            return;
+        }
+        setLoadingState(true);
+        new ListDriveTask(DropboxClientFactory.getClient(), storagePath, new Callback() {
+            @Override
+            public void onTaskComplete(ArrayList<File> result) {
+                mapFileDrive.clear();
+                if (result != null) {
+                    for (File file : result) {
+                        Expense expense = Expense.fromFile(file);
+                        if (expense != null) {
+                            mapFileDrive.put(file, expense.getDisplayText());
+                        }
+                        ExpenseManager.deleteFileQuietly(file);
+                    }
+                }
+                updateDataDrive();
+                setLoadingState(false);
+            }
+
+            @Override
+            public void onError(Exception e) {
+                Log.e(TAG, "Échec du listage des fichiers Dropbox", e);
+                setLoadingState(false);
+            }
+        }).execute();
+    }
+
+    /**
+     * Supprime les dépenses locales sélectionnées.
+     */
+    private void deletePhone() {
+        List<File> filesToDelete = getCheckedFiles(listFilePhone, mapFilePhone);
+        if (filesToDelete.isEmpty()) return;
+
+        setLoadingState(true);
+        AppExecutors.getInstance().diskIO().execute(() -> {
+            for (File file : filesToDelete) {
+                mapFilePhone.remove(file);
+                ExpenseManager.deleteFileQuietly(file);
+            }
+            AppExecutors.getInstance().mainThread().execute(() -> {
+                updateDataPhone();
+                setLoadingState(false);
+                Toast.makeText(MainActivity.this, "Les dépenses sélectionnées ont été supprimées de l'appareil !", Toast.LENGTH_LONG).show();
+            });
+        });
+    }
+
+    /**
+     * Supprime de Dropbox les dépenses sélectionnées dans la liste Drive.
+     */
+    private void deleteDrive() {
+        List<File> filesToDelete = getCheckedFiles(listFileDrive, mapFileDrive);
+        if (filesToDelete.isEmpty() || DropboxClientFactory.getClient() == null) return;
+
+        setLoadingState(true);
+        new DeleteFileTask(DropboxClientFactory.getClient(), new Callback() {
+            @Override
+            public void onTaskComplete(ArrayList<File> result) {
+                if (result != null) {
+                    for (File file : result) {
+                        mapFileDrive.remove(file);
+                    }
+                }
+                updateDataDrive();
+                setLoadingState(false);
+                Toast.makeText(MainActivity.this, "Les dépenses sélectionnées ont été supprimées du drive !", Toast.LENGTH_LONG).show();
+            }
+
+            @Override
+            public void onError(Exception e) {
+                Log.e(TAG, "Échec de la suppression sur Dropbox", e);
+                setLoadingState(false);
+            }
+        }).execute(filesToDelete);
+    }
+
+    /**
+     * Exporte les dépenses sélectionnées du téléphone vers Dropbox, puis les retire du téléphone.
+     */
+    private void upload() {
+        List<File> filesToUpload = getCheckedFiles(listFilePhone, mapFilePhone);
+        if (filesToUpload.isEmpty() || DropboxClientFactory.getClient() == null) return;
+
+        setLoadingState(true);
+        new UploadFileTask(DropboxClientFactory.getClient(), new Callback() {
+            @Override
+            public void onTaskComplete(ArrayList<File> result) {
+                if (result != null) {
+                    AppExecutors.getInstance().diskIO().execute(() -> {
+                        for (File file : result) {
+                            Expense expense = Expense.fromFile(file);
+                            if (expense != null) {
+                                mapFileDrive.put(file, expense.getDisplayText());
+                            }
+                            mapFilePhone.remove(file);
+                            ExpenseManager.deleteFileQuietly(file);
+                        }
+                        AppExecutors.getInstance().mainThread().execute(() -> {
+                            updateDataPhone();
+                            updateDataDrive();
+                            setLoadingState(false);
+                            Toast.makeText(MainActivity.this, "Les dépenses ont été exportées vers Dropbox !", Toast.LENGTH_LONG).show();
+                        });
+                    });
+                } else {
+                    setLoadingState(false);
+                }
+            }
+
+            @Override
+            public void onError(Exception e) {
+                Log.e(TAG, "Échec de l'envoi vers Dropbox", e);
+                setLoadingState(false);
+            }
+        }).execute(filesToUpload);
+    }
+
+    /**
+     * Importe les dépenses sélectionnées de Dropbox vers le téléphone.
+     */
+    private void download() {
+        List<File> filesToDownload = getCheckedFiles(listFileDrive, mapFileDrive);
+        if (filesToDownload.isEmpty() || DropboxClientFactory.getClient() == null) return;
+
+        setLoadingState(true);
+        new DownloadFileTask(getApplicationContext(), DropboxClientFactory.getClient(), storagePath, new Callback() {
+            @Override
+            public void onTaskComplete(ArrayList<File> result) {
+                if (result != null) {
+                    AppExecutors.getInstance().diskIO().execute(() -> {
+                        for (File file : result) {
+                            mapFileDrive.remove(file);
+                            Expense expense = Expense.fromFile(file);
+                            if (expense != null) {
+                                mapFilePhone.put(file, expense.getDisplayText());
+                            } else {
+                                ExpenseManager.deleteFileQuietly(file);
+                            }
+                        }
+                        AppExecutors.getInstance().mainThread().execute(() -> {
+                            updateDataPhone();
+                            updateDataDrive();
+                            setLoadingState(false);
+                            Toast.makeText(MainActivity.this, "Les dépenses sélectionnées ont été importées dans l'appareil !", Toast.LENGTH_LONG).show();
+                        });
+                    });
+                } else {
+                    setLoadingState(false);
+                }
+            }
+
+            @Override
+            public void onError(Exception e) {
+                Log.e(TAG, "Échec du téléchargement depuis Dropbox", e);
+                setLoadingState(false);
+            }
+        }).execute(filesToDownload);
+    }
+
+    /**
+     * Met à jour l'adaptateur de la ListView des dépenses locales du téléphone.
+     */
+    public void updateDataPhone() {
+        ArrayAdapter<String> adapterPhone = new ArrayAdapter<>(this, android.R.layout.simple_list_item_multiple_choice, new ArrayList<>(mapFilePhone.values()));
+        if (listFilePhone != null) {
+            listFilePhone.setAdapter(adapterPhone);
+        }
+        updateButtonStates();
+    }
+
+    /**
+     * Met à jour l'adaptateur de la ListView des dépenses présentes sur Dropbox.
+     */
+    public void updateDataDrive() {
+        ArrayAdapter<String> adapterDrive = new ArrayAdapter<>(this, android.R.layout.simple_list_item_multiple_choice, new ArrayList<>(mapFileDrive.values()));
+        if (listFileDrive != null) {
+            listFileDrive.setAdapter(adapterDrive);
+        }
+        updateButtonStates();
+    }
+}

@@ -2,104 +2,104 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    android:layout_width="fill_parent"
-    android:layout_height="fill_parent"
-    android:orientation="vertical">
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="8dp">
 
-
+    <!-- Top Section: Local Expenses -->
     <LinearLayout
-        android:layout_width="wrap_content"
-        android:layout_height="fill_parent"
-        android:layout_weight="2"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
         android:orientation="vertical">
 
         <TextView
             android:id="@+id/textProg"
-            android:layout_width="fill_parent"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Dépenses locales:"
-            android:textSize="24sp" />
+            android:text="Dépenses locales :"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:paddingBottom="4dp" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_weight="1"
             android:orientation="horizontal">
 
             <ScrollView
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="1">
+                android:layout_weight="1"
+                android:fillViewport="true">
 
                 <LinearLayout
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <Button
-                        android:id="@+id/creerDepense"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="Créer dépenses" />
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingEnd="4dp">
 
                     <EditText
                         android:id="@+id/nomDepense"
-                        android:layout_width="fill_parent"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:hint="Nom dépense"
-                        android:inputType="textMultiLine|textCapSentences"
+                        android:inputType="textCapSentences"
                         android:lines="1"
                         android:minHeight="48dp" />
 
                     <EditText
                         android:id="@+id/cout"
-                        android:layout_width="fill_parent"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:hint="Coût"
+                        android:hint="Coût (€)"
                         android:inputType="numberSigned|numberDecimal"
                         android:lines="1"
                         android:minHeight="48dp" />
 
                     <Button
+                        android:id="@+id/creerDepense"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Créer dépense" />
+
+                    <Button
                         android:id="@+id/supprimerDepenses"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_gravity="center"
-                        android:text="Supprimer dépenses" />
+                        android:text="Supprimer sélection" />
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_weight="0"
                         android:orientation="horizontal">
 
                         <ImageButton
                             android:id="@+id/exportDepense"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
+                            android:layout_width="0dp"
+                            android:layout_height="48dp"
                             android:layout_weight="1"
-                            android:src="@android:drawable/arrow_down_float"
-                            android:text="Export"
-                            tools:ignore="SpeakableTextPresentCheck,TouchTargetSizeCheck" />
+                            android:contentDescription="Exporter vers Dropbox"
+                            android:src="@android:drawable/arrow_down_float" />
+
+                        <ImageButton
+                            android:id="@+id/refreshListPhone"
+                            android:layout_width="0dp"
+                            android:layout_height="48dp"
+                            android:layout_weight="1"
+                            android:contentDescription="Rafraîchir liste locale"
+                            app:srcCompat="@android:drawable/ic_popup_sync" />
+
+                        <ImageButton
+                            android:id="@+id/search_voice_btn"
+                            android:layout_width="0dp"
+                            android:layout_height="48dp"
+                            android:layout_weight="1"
+                            android:contentDescription="Saisie vocale"
+                            app:srcCompat="@drawable/ic_micro" />
                     </LinearLayout>
-
-                    <ImageButton
-                        android:id="@+id/refreshListPhone"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="0"
-                        app:srcCompat="@android:drawable/ic_popup_sync"
-                        tools:ignore="SpeakableTextPresentCheck" />
-
-                    <ImageButton
-                        android:id="@+id/search_voice_btn"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        app:srcCompat="@drawable/ic_micro" />
                 </LinearLayout>
-
             </ScrollView>
 
             <ListView
@@ -109,117 +109,94 @@
                 android:layout_weight="1"
                 android:choiceMode="multipleChoice"
                 android:divider="@color/colorAccent"
-                android:dividerHeight="1dp">
-
-            </ListView>
-
+                android:dividerHeight="1dp"
+                android:nestedScrollingEnabled="true" />
         </LinearLayout>
-
-
     </LinearLayout>
 
+    <ProgressBar
+        android:id="@+id/progressBar"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="8dp"
+        android:indeterminate="true"
+        android:visibility="gone"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="4dp" />
+
+    <!-- Bottom Section: Dropbox Drive Expenses -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="10dp"
-        android:layout_gravity="center"
-        android:layout_weight="0"
-        android:orientation="vertical">
-
-        <!--android:background="@drawable/border"-->
-
-        <ProgressBar
-            android:id="@+id/progressBar"
-            style="?android:attr/progressBarStyleHorizontal"
-            android:layout_width="match_parent"
-            android:layout_height="10dp"
-            android:indeterminate="true"
-            android:visibility="gone" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="wrap_content"
-        android:layout_height="fill_parent"
-        android:layout_gravity="top"
-        android:layout_weight="2"
+        android:layout_height="0dp"
+        android:layout_weight="1"
         android:orientation="vertical">
 
         <TextView
             android:id="@+id/textProgDrive"
-            android:layout_width="fill_parent"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="0"
-            android:text="Dépenses sur le drive:"
-            android:textSize="24sp" />
-
+            android:text="Dépenses sur Dropbox :"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:paddingBottom="4dp" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_weight="1"
             android:orientation="horizontal">
 
             <ScrollView
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="1">
+                android:layout_weight="1"
+                android:fillViewport="true">
 
                 <LinearLayout
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <LinearLayout
-                        android:layout_width="fill_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="0"
-                        android:orientation="horizontal">
-
-
-                        <ImageButton
-                            android:id="@+id/importDepense"
-                            android:layout_width="fill_parent"
-                            android:layout_height="fill_parent"
-                            android:layout_weight="1"
-                            android:src="@android:drawable/arrow_up_float"
-                            android:text="Import"
-                            tools:ignore="SpeakableTextPresentCheck,TouchTargetSizeCheck" />
-                    </LinearLayout>
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingEnd="4dp">
 
                     <Button
                         android:id="@+id/supprimerDepensesDrive"
-                        android:layout_width="fill_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_gravity="center"
-                        android:layout_weight="0"
-                        android:text="Supprimer dépenses" />
-
-                    <ImageButton
-                        android:id="@+id/refreshListDrive"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_weight="0"
-                        app:srcCompat="@android:drawable/ic_popup_sync"
-                        tools:ignore="SpeakableTextPresentCheck" />
+                        android:text="Supprimer du Drive" />
 
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <ImageButton
+                            android:id="@+id/importDepense"
+                            android:layout_width="0dp"
+                            android:layout_height="48dp"
+                            android:layout_weight="1"
+                            android:contentDescription="Importer depuis Dropbox"
+                            android:src="@android:drawable/arrow_up_float" />
+
+                        <ImageButton
+                            android:id="@+id/refreshListDrive"
+                            android:layout_width="0dp"
+                            android:layout_height="48dp"
+                            android:layout_weight="1"
+                            android:contentDescription="Rafraîchir liste Dropbox"
+                            app:srcCompat="@android:drawable/ic_popup_sync" />
+                    </LinearLayout>
                 </LinearLayout>
             </ScrollView>
 
             <ListView
                 android:id="@+id/listViewDrive"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:choiceMode="multipleChoice"
                 android:divider="@android:color/holo_orange_dark"
-                android:dividerHeight="1dp">
-
-            </ListView>
-
+                android:dividerHeight="1dp"
+                android:nestedScrollingEnabled="true" />
         </LinearLayout>
-
-
     </LinearLayout>
-
 
 </LinearLayout>

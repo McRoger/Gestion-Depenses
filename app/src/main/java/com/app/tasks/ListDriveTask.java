@@ -1,9 +1,10 @@
 package com.app.tasks;
 
-import android.os.AsyncTask;
+import android.util.Log;
 
-import com.app.gestiondepenses.MainActivity;
 import com.app.interfaceGestion.Callback;
+import com.app.models.Expense;
+import com.app.utils.AppExecutors;
 import com.dropbox.core.DbxException;
 import com.dropbox.core.v2.DbxClientV2;
 import com.dropbox.core.v2.files.FileMetadata;
@@ -16,84 +17,73 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 
-public class ListDriveTask extends AsyncTask<ArrayList<File>,Void,ArrayList<File>> {
+/**
+ * Task to list files in Dropbox drive asynchronously.
+ */
+public class ListDriveTask {
 
     private final DbxClientV2 mDbxClient;
     private final Callback mCallback;
-    private Exception mException;
-
-    private File mPath;
+    private final File mPath;
 
     public ListDriveTask(DbxClientV2 dbxClient, File path, Callback callback) {
         mDbxClient = dbxClient;
         mCallback = callback;
-        mPath=path;
+        mPath = path;
     }
 
-    @Override
-    protected void onPostExecute(ArrayList<File> result) {
-        super.onPostExecute(result);
-        if (mException != null) {
-            mCallback.onError(mException);
-        } else {
-            mCallback.onTaskComplete(result);
-        }
-    }
+    public void execute() {
+        AppExecutors.getInstance().networkIO().execute(() -> {
+            final ArrayList<File> files = new ArrayList<>();
+            Exception exception = null;
 
-
-    @SafeVarargs
-    @Override
-    protected final ArrayList<File> doInBackground(ArrayList<File>... arrayLists) {
-
-        ArrayList<File> files = new ArrayList<>();
-        try {
-            ListFolderResult result = mDbxClient.files().listFolder("");
-
-            for (Metadata o : result.getEntries()) {
-
-                FileMetadata metadata = (FileMetadata) o;
-
-                extracted(files, metadata);
-            }
-        } catch (DbxException e) {
-            e.printStackTrace();
-        }
-        return files;
-    }
-
-    private void extracted(ArrayList<File> files, FileMetadata metadata) {
-        try {
-            File file = new File(mPath, metadata.getName());
-
-//             Make sure the Downloads directory exists.
-            if (!mPath.exists()) {
-                if (!mPath.mkdirs()) {
-                    mException = new RuntimeException("Unable to create directory: " + mPath);
+            if (mDbxClient != null && mPath != null) {
+                if (!mPath.exists() && !mPath.mkdirs()) {
+                    Log.e("ListDriveTask", "Unable to create directory: " + mPath);
                 }
-            } else if (!mPath.isDirectory()) {
-                mException = new IllegalStateException("Download path is not a directory: " + mPath);
-            }
 
-            // Download the file.
-            try (OutputStream outputStream = new FileOutputStream(file)) {
-                mDbxClient.files().download(metadata.getPathLower())
-                        .download(outputStream);
+                try {
+                    ListFolderResult result = mDbxClient.files().listFolder("");
 
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+                    for (Metadata o : result.getEntries()) {
+                        if (o instanceof FileMetadata) {
+                            FileMetadata metadata = (FileMetadata) o;
+                            File file = new File(mPath, metadata.getName());
 
+                            try (OutputStream outputStream = new FileOutputStream(file)) {
+                                mDbxClient.files().download(metadata.getPathLower())
+                                        .download(outputStream);
+                            }
 
-            if (MainActivity.readFile(file) != null) {
-                files.add(file);
-            } else {
-                try (OutputStream outputStream = new FileOutputStream(file)) {
-                    mDbxClient.files().delete(metadata.getPathLower());
+                            if (Expense.fromFile(file) != null) {
+                                files.add(file);
+                            } else {
+                                try {
+                                    mDbxClient.files().deleteV2(metadata.getPathLower());
+                                } catch (DbxException ignored) {
+                                }
+                                if (file.exists()) {
+                                    file.delete();
+                                }
+                            }
+                        }
+                    }
+                } catch (DbxException | IOException e) {
+                    Log.e("ListDriveTask", "Error listing Dropbox files", e);
+                    exception = e;
                 }
             }
 
-        } catch (DbxException | IOException e) {
-            mException = e;
-        }
+            final Exception finalException = exception;
+            AppExecutors.getInstance().mainThread().execute(() -> {
+                if (mCallback != null) {
+                    if (finalException != null && files.isEmpty()) {
+                        mCallback.onError(finalException);
+                    } else {
+                        mCallback.onTaskComplete(files);
+                    }
+                }
+            });
+        });
     }
 }
