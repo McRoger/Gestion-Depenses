@@ -52,18 +52,20 @@
     <option name="autoReloadType" value="NONE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="f07c9414-831c-4602-824f-13ce4f0995a5" name="Default Changelist" comment="V5 : Update des versions java, gradle et dropbox">
-      <change beforePath="$PROJECT_DIR$/.idea/compiler.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/compiler.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/gradle.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/gradle.xml" afterDir="false" />
+    <list default="true" id="f07c9414-831c-4602-824f-13ce4f0995a5" name="Default Changelist" comment="V6 : Amélioration avec Gemini">
+      <change afterPath="$PROJECT_DIR$/app/src/main/java/com/app/managers/ExpenseManager.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/src/main/java/com/app/models/Expense.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/src/main/java/com/app/utils/AppExecutors.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/src/test/java/com/app/gestiondepenses/ExpenseUnitTest.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/app/build.gradle" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/AndroidManifest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/AndroidManifest.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/app/dropbox/DropboxClientFactory.java" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/app/dropbox/DropboxClientFactory.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/app/dropbox/LoginActivity.java" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/app/dropbox/LoginActivity.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/java/com/app/gestiondepenses/MainActivity.java" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/app/gestiondepenses/MainActivity.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/app/tasks/DeleteFileTask.java" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/app/tasks/DeleteFileTask.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/app/tasks/DownloadFileTask.java" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/app/tasks/DownloadFileTask.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/app/tasks/ListDriveTask.java" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/app/tasks/ListDriveTask.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/app/tasks/UploadFileTask.java" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/app/tasks/UploadFileTask.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/res/layout-land/activity_main.xml" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/res/layout-land/activity_main.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/res/layout/activity_main.xml" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/res/layout/activity_main.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/values/strings.xml" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/res/values/strings.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -123,6 +125,7 @@
   </component>
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
+    "Android App.androidTest.executor": "Run",
     "Android App.app.executor": "Run",
     "Android App.main.executor": "Run",
     "CidrDebugProfileConversion": "true",
@@ -157,7 +160,7 @@
       <recent name="com.app.dropbox" />
     </key>
   </component>
-  <component name="RunManager" selected="Android App.main">
+  <component name="RunManager" selected="Android App.androidTest">
     <configuration name="androidTest" type="AndroidRunConfigurationType" factoryName="Android App" activateToolWindowBeforeRun="false">
       <module name="Gestion_Depenses.app.androidTest" />
       <option name="ANDROID_RUN_CONFIGURATION_SCHEMA_VERSION" value="1" />
@@ -456,7 +459,8 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="V5 : Update des versions java, gradle et dropbox" />
-    <option name="LAST_COMMIT_MESSAGE" value="V5 : Update des versions java, gradle et dropbox" />
+    <MESSAGE value="V6 : Amélioration avec Gemini" />
+    <option name="LAST_COMMIT_MESSAGE" value="V6 : Amélioration avec Gemini" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -465,16 +469,6 @@
           <url>file://$PROJECT_DIR$/app/src/main/java/com/app/dropbox/DropboxClient.java</url>
           <line>16</line>
           <option name="timeStamp" value="51" />
-        </line-breakpoint>
-        <line-breakpoint suspend="THREAD" type="java-line">
-          <url>file://$PROJECT_DIR$/app/src/main/java/com/app/dropbox/LoginActivity.java</url>
-          <line>134</line>
-          <option name="timeStamp" value="60" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="java-line">
-          <url>file://$PROJECT_DIR$/app/src/main/java/com/app/dropbox/LoginActivity.java</url>
-          <line>136</line>
-          <option name="timeStamp" value="84" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>

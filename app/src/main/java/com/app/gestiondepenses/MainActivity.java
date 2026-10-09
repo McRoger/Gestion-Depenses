@@ -1,12 +1,15 @@
 package com.app.gestiondepenses;
 
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
 import android.os.Bundle;
 import android.speech.RecognizerIntent;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.util.SparseBooleanArray;
 import android.view.View;
@@ -16,10 +19,13 @@ import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ListView;
 import android.widget.ProgressBar;
+import android.widget.Spinner;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
 
 import com.app.dropbox.DropboxClientFactory;
@@ -27,7 +33,6 @@ import com.app.dropbox.LoginActivity;
 import com.app.interfaceGestion.Callback;
 import com.app.managers.ExpenseManager;
 import com.app.models.Expense;
-import com.app.tasks.DeleteFileTask;
 import com.app.tasks.DownloadFileTask;
 import com.app.tasks.GetCurrentAccountTask;
 import com.app.tasks.ListDriveTask;
@@ -38,8 +43,10 @@ import com.dropbox.core.v2.users.FullAccount;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Matcher;
@@ -51,13 +58,12 @@ import java.util.regex.Pattern;
 public class MainActivity extends LoginActivity {
 
     private static final String TAG = "MainActivity";
+    private static final String PREFS_CAT_HISTORY = "category_history";
     private static final int SPEECH_REQUEST_CODE = 100;
 
-    // Dossier de stockage local sécurisé spécifique à l'application
     private static File storagePath;
     private ExpenseManager expenseManager;
 
-    // Composants de l'interface graphique (UI)
     private ListView listFilePhone;
     private ListView listFileDrive;
 
@@ -69,20 +75,21 @@ public class MainActivity extends LoginActivity {
     private ImageButton refreshListPhone;
     private ImageButton refreshListDrive;
     private ImageButton voiceButton;
+    private ImageButton btnSettings;
 
     private EditText nomDepense;
     private EditText cout;
+    private Spinner spinnerCategory;
+    private TextView totalLocal;
+    private TextView totalDrive;
     private ProgressBar progressBar;
 
-    // Cartes associant le fichier physique (.txt) à son texte d'affichage ("Nom | Coût €")
-    private final HashMap<File, String> mapFilePhone = new HashMap<>();
-    private final HashMap<File, String> mapFileDrive = new HashMap<>();
+    private final List<Expense> localExpenseList = new ArrayList<>();
+    private final List<Expense> driveExpenseList = new ArrayList<>();
 
-    // États du réseau et d'interaction utilisateur
     private boolean accesInternet = true;
     private boolean isCliquable = true;
 
-    // Gestionnaire réactif de l'état du réseau (remplace l'ancienne boucle infinie de 100ms)
     private ConnectivityManager connectivityManager;
     private ConnectivityManager.NetworkCallback networkCallback;
 
@@ -90,16 +97,17 @@ public class MainActivity extends LoginActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Initialisation du dossier de stockage interne/externe sans dépendre de permissions obsolètes
         File[] externalFilesDirs = ContextCompat.getExternalFilesDirs(getApplicationContext(), null);
         storagePath = (externalFilesDirs != null && externalFilesDirs.length > 0) ? externalFilesDirs[0] : getFilesDir();
         expenseManager = new ExpenseManager(storagePath);
 
         setContentView(R.layout.activity_main);
 
-        // Liaison des vues XML aux variables Java
         nomDepense = findViewById(R.id.nomDepense);
         cout = findViewById(R.id.cout);
+        spinnerCategory = findViewById(R.id.spinnerCategory);
+        totalLocal = findViewById(R.id.totalLocal);
+        totalDrive = findViewById(R.id.totalDrive);
 
         listFilePhone = findViewById(R.id.listViewPhone);
         listFileDrive = findViewById(R.id.listViewDrive);
@@ -113,23 +121,18 @@ public class MainActivity extends LoginActivity {
         refreshListPhone = findViewById(R.id.refreshListPhone);
         refreshListDrive = findViewById(R.id.refreshListDrive);
         voiceButton = findViewById(R.id.search_voice_btn);
+        btnSettings = findViewById(R.id.btnSettings);
 
-        // Configuration des événements clics et de l'écouteur de réseau
         setupListeners();
         setupNetworkCallback();
 
-        // Chargement initial des dépenses locales
         getFilesPhone();
 
-        // Chargement des dépenses distantes Dropbox si le client est authentifié
         if (DropboxClientFactory.getClient() != null) {
             getFilesDrive();
         }
     }
 
-    /**
-     * Attache les écouteurs d'événements aux boutons et aux listes.
-     */
     private void setupListeners() {
         creerDepense.setOnClickListener(view -> createFile());
         exportDepenses.setOnClickListener(view -> upload());
@@ -142,19 +145,124 @@ public class MainActivity extends LoginActivity {
 
         voiceButton.setOnClickListener(view -> displaySpeechRecognizer());
 
-        // Mise à jour automatique de l'état des boutons lors de la sélection/décochage d'éléments
+        if (btnSettings != null) {
+            btnSettings.setOnClickListener(v -> showSettingsDialog());
+        }
+
         if (listFilePhone != null) {
             listFilePhone.setOnItemClickListener((parent, view, position, id) -> updateButtonStates());
         }
         if (listFileDrive != null) {
             listFileDrive.setOnItemClickListener((parent, view, position, id) -> updateButtonStates());
         }
+
+        if (nomDepense != null) {
+            nomDepense.setOnFocusChangeListener((v, hasFocus) -> {
+                if (!hasFocus) {
+                    suggestCategoryForName(nomDepense.getText().toString());
+                }
+            });
+            nomDepense.addTextChangedListener(new TextWatcher() {
+                @Override
+                public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+                }
+
+                @Override
+                public void onTextChanged(CharSequence s, int start, int before, int count) {
+                }
+
+                @Override
+                public void afterTextChanged(Editable s) {
+                    suggestCategoryForName(s.toString());
+                }
+            });
+        }
     }
 
     /**
-     * Configure un NetworkCallback pour être notifié des changements de connexion
-     * (évite de consommer la batterie avec une boucle de vérification constante).
+     * Affiche la boîte de dialogue des préférences.
      */
+    private void showSettingsDialog() {
+        SharedPreferences prefs = getSharedPreferences(PREFS_CAT_HISTORY, MODE_PRIVATE);
+        Map<String, ?> allHistory = prefs.getAll();
+
+        List<String> keys = new ArrayList<>();
+        for (String key : allHistory.keySet()) {
+            if (key != null && key.startsWith("cat_")) {
+                keys.add(key);
+            }
+        }
+
+        // Tri par ordre alphabétique insensible à la casse
+        Collections.sort(keys, (k1, k2) -> {
+            String name1 = k1.substring(4);
+            String name2 = k2.substring(4);
+            return name1.compareToIgnoreCase(name2);
+        });
+
+        StringBuilder historyText = new StringBuilder();
+        if (keys.isEmpty()) {
+            historyText.append("Aucune association enregistrée.");
+        } else {
+            for (String key : keys) {
+                String name = key.substring(4);
+                Object catVal = allHistory.get(key);
+                if (!name.isEmpty() && catVal != null) {
+                    name = Character.toUpperCase(name.charAt(0)) + name.substring(1);
+                    historyText.append("• ").append(name).append(" ➔ ").append(catVal).append("\n");
+                }
+            }
+        }
+
+        boolean isDropboxConnected = DropboxClientFactory.getClient() != null;
+        String statusText = isDropboxConnected ? "Connecté à Dropbox" : "Non connecté à Dropbox";
+
+        new AlertDialog.Builder(this)
+                .setTitle("Préférences & Paramètres")
+                .setMessage("Statut : " + statusText + "\n\n" +
+                        "Historique des Catégories :\n" + historyText)
+                .setPositiveButton("Fermer", null)
+                .setNeutralButton("Vider l'historique", (dialog, which) -> {
+                    prefs.edit().clear().apply();
+                    Toast.makeText(MainActivity.this, "Historique des catégories effacé", Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton(isDropboxConnected ? "Se déconnecter de Dropbox" : "Connexion Dropbox", (dialog, which) -> {
+                    if (isDropboxConnected) {
+                        getSharedPreferences("dropbox-sample", MODE_PRIVATE).edit().clear().apply();
+                        DropboxClientFactory.clearClient();
+                        Toast.makeText(MainActivity.this, "Déconnecté de Dropbox", Toast.LENGTH_SHORT).show();
+                        driveExpenseList.clear();
+                        updateDataDrive();
+                    } else {
+                        startOAuth2Authentication(MainActivity.this, getString(R.string.APP_KEY),
+                                Arrays.asList("account_info.read", "files.content.write", "files.content.read"));
+                    }
+                })
+                .show();
+    }
+
+    private void saveCategoryHistory(String name, String category) {
+        if (name == null || name.trim().isEmpty() || category == null || category.trim().isEmpty()) return;
+        SharedPreferences prefs = getSharedPreferences(PREFS_CAT_HISTORY, MODE_PRIVATE);
+        prefs.edit().putString("cat_" + name.trim().toLowerCase(Locale.FRANCE), category.trim()).apply();
+    }
+
+    private void suggestCategoryForName(String name) {
+        if (name == null || name.trim().isEmpty() || spinnerCategory == null) return;
+        SharedPreferences prefs = getSharedPreferences(PREFS_CAT_HISTORY, MODE_PRIVATE);
+        String savedCategory = prefs.getString("cat_" + name.trim().toLowerCase(Locale.FRANCE), null);
+        if (savedCategory != null) {
+            @SuppressWarnings("unchecked")
+            ArrayAdapter<CharSequence> adapter = (ArrayAdapter<CharSequence>) spinnerCategory.getAdapter();
+            if (adapter != null) {
+                int position = adapter.getPosition(savedCategory);
+                if (position >= 0) {
+                    spinnerCategory.setSelection(position);
+                }
+            }
+        }
+    }
+
     private void setupNetworkCallback() {
         connectivityManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
         if (connectivityManager == null) return;
@@ -162,12 +270,10 @@ public class MainActivity extends LoginActivity {
         networkCallback = new ConnectivityManager.NetworkCallback() {
             @Override
             public void onAvailable(@NonNull Network network) {
-                // Exécution sur le thread principal pour mettre à jour l'UI
                 AppExecutors.getInstance().mainThread().execute(() -> {
                     boolean previousState = accesInternet;
                     accesInternet = true;
                     updateButtonStates();
-                    // Si la connexion vient de revenir, rafraîchir les listes
                     if (!previousState && DropboxClientFactory.getClient() != null) {
                         getFilesDrive();
                         getFilesPhone();
@@ -188,7 +294,6 @@ public class MainActivity extends LoginActivity {
     @Override
     protected void onStart() {
         super.onStart();
-        // Enregistrement de l'écouteur réseau lors du démarrage de l'activité
         if (connectivityManager != null && networkCallback != null) {
             NetworkRequest request = new NetworkRequest.Builder()
                     .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
@@ -206,7 +311,6 @@ public class MainActivity extends LoginActivity {
     @Override
     protected void onStop() {
         super.onStop();
-        // Désinscription de l'écouteur réseau pour éviter toute fuite de mémoire
         if (connectivityManager != null && networkCallback != null) {
             try {
                 connectivityManager.unregisterNetworkCallback(networkCallback);
@@ -215,9 +319,6 @@ public class MainActivity extends LoginActivity {
         }
     }
 
-    /**
-     * Teste si un réseau actif dispose d'une connexion internet utilisable.
-     */
     private boolean isNetworkAvailable() {
         if (connectivityManager == null) return false;
         Network nw = connectivityManager.getActiveNetwork();
@@ -229,9 +330,6 @@ public class MainActivity extends LoginActivity {
                 actNw.hasTransport(NetworkCapabilities.TRANSPORT_BLUETOOTH));
     }
 
-    /**
-     * Déclenche l'assistant de reconnaissance vocale Android.
-     */
     private void displaySpeechRecognizer() {
         Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
@@ -242,9 +340,6 @@ public class MainActivity extends LoginActivity {
         }
     }
 
-    /**
-     * Traite le résultat retourné par la reconnaissance vocale.
-     */
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         if (requestCode == SPEECH_REQUEST_CODE && resultCode == RESULT_OK && data != null) {
@@ -257,31 +352,29 @@ public class MainActivity extends LoginActivity {
         super.onActivityResult(requestCode, resultCode, data);
     }
 
-    /**
-     * Extrait le nom du commerce et le coût à partir d'une phrase dictée (ex: "dépense Courses coûte 25,50").
-     */
     private void parseAndApplyVoiceText(String sentence) {
         Pattern pattern = Pattern.compile("(?<=\\bdépense\\s)(.+)co(...?)\\s(([\\d\\W,])+)", Pattern.CASE_INSENSITIVE);
         Matcher matcher = pattern.matcher(sentence);
         if (matcher.find()) {
-            nomDepense.setText(modificationMot(matcher.group(1)));
+            String name = modificationMot(matcher.group(1));
+            nomDepense.setText(name);
             cout.setText(matcher.group(3));
+            suggestCategoryForName(name);
             createFile();
         } else {
             pattern = Pattern.compile("(?<=\\bdépense\\s)(.+)co(.)*\\s(-?|moins)(([\\d\\W,])+)", Pattern.CASE_INSENSITIVE);
             matcher = pattern.matcher(sentence);
             if (matcher.find()) {
-                nomDepense.setText(modificationMot(matcher.group(1)));
-                String negValue = "-" + matcher.group(4);
-                cout.setText(negValue);
+                String name = modificationMot(matcher.group(1));
+                nomDepense.setText(name);
+                String negVal = "-" + matcher.group(4);
+                cout.setText(negVal);
+                suggestCategoryForName(name);
                 createFile();
             }
         }
     }
 
-    /**
-     * Corrige automatiquement certaines erreurs courantes de dictée (ex: "Intermarché").
-     */
     private String modificationMot(String mot) {
         if (mot == null) return "";
         Pattern pattern = Pattern.compile(".ntermarc(.)+", Pattern.CASE_INSENSITIVE);
@@ -303,14 +396,11 @@ public class MainActivity extends LoginActivity {
 
             @Override
             public void onError(Exception e) {
-                Log.e(TAG, "Échec lors de la récupération du compte Dropbox.", e);
+                Log.e(TAG, "Échec de la récupération du compte Dropbox.", e);
             }
         }).execute();
     }
 
-    /**
-     * Vérifie si au moins un élément est coché dans une ListView.
-     */
     private boolean areItemsChecked(ListView listView) {
         if (listView == null) return false;
         SparseBooleanArray checkItem = listView.getCheckedItemPositions();
@@ -324,9 +414,6 @@ public class MainActivity extends LoginActivity {
         return false;
     }
 
-    /**
-     * Active/désactive l'indicateur de chargement et verrouille l'interface durant une tâche d'arrière-plan.
-     */
     private void setLoadingState(boolean loading) {
         isCliquable = !loading;
         if (progressBar != null) {
@@ -335,10 +422,6 @@ public class MainActivity extends LoginActivity {
         updateButtonStates();
     }
 
-    /**
-     * Met à jour dynamiquement l'état activé/désactivé des boutons en fonction du réseau,
-     * de l'état de chargement et des éléments cochés.
-     */
     public void updateButtonStates() {
         boolean hasNetwork = accesInternet;
         boolean canClick = isCliquable;
@@ -372,90 +455,97 @@ public class MainActivity extends LoginActivity {
         }
     }
 
-    /**
-     * Récupère la liste des fichiers correspondant aux éléments actuellement cochés dans une ListView.
-     */
-    private List<File> getCheckedFiles(ListView listView, Map<File, String> map) {
-        List<File> files = new ArrayList<>();
-        if (listView == null || map == null) return files;
-
-        SparseBooleanArray checked = listView.getCheckedItemPositions();
+    private List<Expense> getCheckedLocalExpenses() {
+        List<Expense> result = new ArrayList<>();
+        if (listFilePhone == null) return result;
+        SparseBooleanArray checked = listFilePhone.getCheckedItemPositions();
         if (checked != null) {
             for (int i = 0; i < checked.size(); i++) {
                 if (checked.valueAt(i)) {
-                    Object itemObj = listView.getAdapter().getItem(checked.keyAt(i));
-                    if (itemObj != null) {
-                        String itemText = itemObj.toString();
-                        File match = getFileValue(map, itemText, files);
-                        if (match != null) {
-                            files.add(match);
-                        }
+                    int pos = checked.keyAt(i);
+                    if (pos >= 0 && pos < localExpenseList.size()) {
+                        result.add(localExpenseList.get(pos));
                     }
                 }
             }
         }
-        return files;
+        return result;
     }
 
-    /**
-     * Recherche la clé (File) dans une Map à partir de sa valeur affichée.
-     */
-    public static <T, E> File getFileValue(Map<T, E> map, E value, List<T> files) {
-        if (map == null || value == null) return null;
-        for (Map.Entry<T, E> entry : map.entrySet()) {
-            if (Objects.equals(value, entry.getValue()) && (files == null || !files.contains(entry.getKey()))) {
-                return (File) entry.getKey();
+    private List<Expense> getCheckedDriveExpenses() {
+        List<Expense> result = new ArrayList<>();
+        if (listFileDrive == null) return result;
+        SparseBooleanArray checked = listFileDrive.getCheckedItemPositions();
+        if (checked != null) {
+            for (int i = 0; i < checked.size(); i++) {
+                if (checked.valueAt(i)) {
+                    int pos = checked.keyAt(i);
+                    if (pos >= 0 && pos < driveExpenseList.size()) {
+                        result.add(driveExpenseList.get(pos));
+                    }
+                }
             }
         }
-        return null;
+        return result;
     }
 
-    /**
-     * Crée une nouvelle dépense locale de manière asynchrone sans bloquer l'IHM.
-     */
+    private boolean isExpenseSelected(Expense expense, List<Expense> selectedList) {
+        if (expense == null || selectedList == null) return false;
+        for (Expense sel : selectedList) {
+            if (sel != null && Objects.equals(sel.getName(), expense.getName())
+                    && Objects.equals(sel.getAmount(), expense.getAmount())
+                    && Objects.equals(sel.getCategory(), expense.getCategory())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void createFile() {
         final String nameStr = nomDepense.getText().toString().trim();
         final String coutStr = cout.getText().toString().trim();
+        final String categoryStr = spinnerCategory != null && spinnerCategory.getSelectedItem() != null ?
+                spinnerCategory.getSelectedItem().toString() : "Autre";
 
         if (nameStr.isEmpty() || coutStr.isEmpty()) {
             Toast.makeText(this, "Veuillez remplir le nom et le coût", Toast.LENGTH_SHORT).show();
             return;
         }
 
+        saveCategoryHistory(nameStr, categoryStr);
+
         setLoadingState(true);
-        // Exécution en arrière-plan sur le pool de threads de stockage
         AppExecutors.getInstance().diskIO().execute(() -> {
             try {
-                expenseManager.createExpense(nameStr, coutStr);
-                // Retour sur le thread principal pour mettre à jour l'IHM
+                expenseManager.createExpense(nameStr, coutStr, categoryStr);
                 AppExecutors.getInstance().mainThread().execute(() -> {
                     nomDepense.setText("");
                     cout.setText("");
                     setLoadingState(false);
                     getFilesPhone();
-                    Toast.makeText(MainActivity.this, "Une dépense a été créée !", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(MainActivity.this, "Dépense créée avec succès !", Toast.LENGTH_SHORT).show();
                 });
             } catch (IOException e) {
-                Log.e(TAG, "Erreur lors de la création du fichier de dépense", e);
+                Log.e(TAG, "Erreur lors de la création de la dépense", e);
                 AppExecutors.getInstance().mainThread().execute(() -> {
                     setLoadingState(false);
-                    Toast.makeText(MainActivity.this, "Erreur lors de la création de la dépense", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(MainActivity.this, "Erreur lors de la création", Toast.LENGTH_SHORT).show();
                 });
             }
         });
     }
 
-    /**
-     * Charge de manière asynchrone les dépenses enregistrées localement sur le téléphone.
-     */
     private void getFilesPhone() {
         setLoadingState(true);
         AppExecutors.getInstance().diskIO().execute(() -> {
             List<Expense> expenses = expenseManager.getLocalExpenses();
             AppExecutors.getInstance().mainThread().execute(() -> {
-                mapFilePhone.clear();
-                for (Expense expense : expenses) {
-                    mapFilePhone.put(expense.getFile(), expense.getDisplayText());
+                localExpenseList.clear();
+                localExpenseList.addAll(expenses);
+                for (Expense e : expenses) {
+                    if (e != null) {
+                        saveCategoryHistory(e.getName(), e.getCategory());
+                    }
                 }
                 updateDataPhone();
                 setLoadingState(false);
@@ -463,9 +553,6 @@ public class MainActivity extends LoginActivity {
         });
     }
 
-    /**
-     * Récupère la liste des dépenses stockées sur le compte Dropbox.
-     */
     private void getFilesDrive() {
         if (DropboxClientFactory.getClient() == null) {
             updateDataDrive();
@@ -475,12 +562,15 @@ public class MainActivity extends LoginActivity {
         new ListDriveTask(DropboxClientFactory.getClient(), storagePath, new Callback() {
             @Override
             public void onTaskComplete(ArrayList<File> result) {
-                mapFileDrive.clear();
+                driveExpenseList.clear();
                 if (result != null) {
                     for (File file : result) {
-                        Expense expense = Expense.fromFile(file);
-                        if (expense != null) {
-                            mapFileDrive.put(file, expense.getDisplayText());
+                        List<Expense> expensesInFile = Expense.parseAllExpensesFromFile(file);
+                        driveExpenseList.addAll(expensesInFile);
+                        for (Expense e : expensesInFile) {
+                            if (e != null) {
+                                saveCategoryHistory(e.getName(), e.getCategory());
+                            }
                         }
                         ExpenseManager.deleteFileQuietly(file);
                     }
@@ -491,109 +581,41 @@ public class MainActivity extends LoginActivity {
 
             @Override
             public void onError(Exception e) {
-                Log.e(TAG, "Échec du listage des fichiers Dropbox", e);
+                Log.e(TAG, "Échec du listage Dropbox", e);
                 setLoadingState(false);
             }
         }).execute();
     }
 
-    /**
-     * Supprime les dépenses locales sélectionnées.
-     */
     private void deletePhone() {
-        List<File> filesToDelete = getCheckedFiles(listFilePhone, mapFilePhone);
-        if (filesToDelete.isEmpty()) return;
+        List<Expense> expensesToDelete = getCheckedLocalExpenses();
+        if (expensesToDelete.isEmpty()) return;
 
         setLoadingState(true);
         AppExecutors.getInstance().diskIO().execute(() -> {
-            for (File file : filesToDelete) {
-                mapFilePhone.remove(file);
-                ExpenseManager.deleteFileQuietly(file);
+            for (Expense expense : expensesToDelete) {
+                if (expense != null && expense.getFile() != null) {
+                    ExpenseManager.deleteFileQuietly(expense.getFile());
+                }
             }
             AppExecutors.getInstance().mainThread().execute(() -> {
-                updateDataPhone();
+                getFilesPhone();
                 setLoadingState(false);
-                Toast.makeText(MainActivity.this, "Les dépenses sélectionnées ont été supprimées de l'appareil !", Toast.LENGTH_LONG).show();
+                Toast.makeText(MainActivity.this, "Dépenses supprimées de l'appareil !", Toast.LENGTH_LONG).show();
             });
         });
     }
 
-    /**
-     * Supprime de Dropbox les dépenses sélectionnées dans la liste Drive.
-     */
     private void deleteDrive() {
-        List<File> filesToDelete = getCheckedFiles(listFileDrive, mapFileDrive);
-        if (filesToDelete.isEmpty() || DropboxClientFactory.getClient() == null) return;
+        List<Expense> selectedExpenses = getCheckedDriveExpenses();
+        if (selectedExpenses.isEmpty() || DropboxClientFactory.getClient() == null) return;
 
-        setLoadingState(true);
-        new DeleteFileTask(DropboxClientFactory.getClient(), new Callback() {
-            @Override
-            public void onTaskComplete(ArrayList<File> result) {
-                if (result != null) {
-                    for (File file : result) {
-                        mapFileDrive.remove(file);
-                    }
-                }
-                updateDataDrive();
-                setLoadingState(false);
-                Toast.makeText(MainActivity.this, "Les dépenses sélectionnées ont été supprimées du drive !", Toast.LENGTH_LONG).show();
+        List<File> filesToDownload = new ArrayList<>();
+        for (Expense e : selectedExpenses) {
+            if (e != null && e.getFile() != null && !filesToDownload.contains(e.getFile())) {
+                filesToDownload.add(e.getFile());
             }
-
-            @Override
-            public void onError(Exception e) {
-                Log.e(TAG, "Échec de la suppression sur Dropbox", e);
-                setLoadingState(false);
-            }
-        }).execute(filesToDelete);
-    }
-
-    /**
-     * Exporte les dépenses sélectionnées du téléphone vers Dropbox, puis les retire du téléphone.
-     */
-    private void upload() {
-        List<File> filesToUpload = getCheckedFiles(listFilePhone, mapFilePhone);
-        if (filesToUpload.isEmpty() || DropboxClientFactory.getClient() == null) return;
-
-        setLoadingState(true);
-        new UploadFileTask(DropboxClientFactory.getClient(), new Callback() {
-            @Override
-            public void onTaskComplete(ArrayList<File> result) {
-                if (result != null) {
-                    AppExecutors.getInstance().diskIO().execute(() -> {
-                        for (File file : result) {
-                            Expense expense = Expense.fromFile(file);
-                            if (expense != null) {
-                                mapFileDrive.put(file, expense.getDisplayText());
-                            }
-                            mapFilePhone.remove(file);
-                            ExpenseManager.deleteFileQuietly(file);
-                        }
-                        AppExecutors.getInstance().mainThread().execute(() -> {
-                            updateDataPhone();
-                            updateDataDrive();
-                            setLoadingState(false);
-                            Toast.makeText(MainActivity.this, "Les dépenses ont été exportées vers Dropbox !", Toast.LENGTH_LONG).show();
-                        });
-                    });
-                } else {
-                    setLoadingState(false);
-                }
-            }
-
-            @Override
-            public void onError(Exception e) {
-                Log.e(TAG, "Échec de l'envoi vers Dropbox", e);
-                setLoadingState(false);
-            }
-        }).execute(filesToUpload);
-    }
-
-    /**
-     * Importe les dépenses sélectionnées de Dropbox vers le téléphone.
-     */
-    private void download() {
-        List<File> filesToDownload = getCheckedFiles(listFileDrive, mapFileDrive);
-        if (filesToDownload.isEmpty() || DropboxClientFactory.getClient() == null) return;
+        }
 
         setLoadingState(true);
         new DownloadFileTask(getApplicationContext(), DropboxClientFactory.getClient(), storagePath, new Callback() {
@@ -601,20 +623,52 @@ public class MainActivity extends LoginActivity {
             public void onTaskComplete(ArrayList<File> result) {
                 if (result != null) {
                     AppExecutors.getInstance().diskIO().execute(() -> {
+                        List<Expense> unselectedExpensesToKeep = new ArrayList<>();
+
                         for (File file : result) {
-                            mapFileDrive.remove(file);
-                            Expense expense = Expense.fromFile(file);
-                            if (expense != null) {
-                                mapFilePhone.put(file, expense.getDisplayText());
-                            } else {
-                                ExpenseManager.deleteFileQuietly(file);
+                            List<Expense> expensesInFile = Expense.parseAllExpensesFromFile(file);
+                            for (Expense expense : expensesInFile) {
+                                if (!isExpenseSelected(expense, selectedExpenses)) {
+                                    unselectedExpensesToKeep.add(expense);
+                                }
+                            }
+                            ExpenseManager.deleteFileQuietly(file);
+                        }
+
+                        if (!unselectedExpensesToKeep.isEmpty()) {
+                            try {
+                                File unselectedCsv = expenseManager.generateConsolidatedCsvFile(unselectedExpensesToKeep);
+                                if (unselectedCsv != null) {
+                                    List<File> toReUpload = new ArrayList<>();
+                                    toReUpload.add(unselectedCsv);
+                                    new UploadFileTask(DropboxClientFactory.getClient(), new Callback() {
+                                        @Override
+                                        public void onTaskComplete(ArrayList<File> res) {
+                                            ExpenseManager.deleteFileQuietly(unselectedCsv);
+                                            AppExecutors.getInstance().mainThread().execute(() -> {
+                                                getFilesDrive();
+                                                setLoadingState(false);
+                                                Toast.makeText(MainActivity.this, "Dépenses sélectionnées supprimées de Dropbox !", Toast.LENGTH_LONG).show();
+                                            });
+                                        }
+
+                                        @Override
+                                        public void onError(Exception e) {
+                                            Log.e(TAG, "Échec de la ré-upload", e);
+                                            setLoadingState(false);
+                                        }
+                                    }).execute(toReUpload);
+                                    return;
+                                }
+                            } catch (IOException e) {
+                                Log.e(TAG, "Erreur génération CSV", e);
                             }
                         }
+
                         AppExecutors.getInstance().mainThread().execute(() -> {
-                            updateDataPhone();
-                            updateDataDrive();
+                            getFilesDrive();
                             setLoadingState(false);
-                            Toast.makeText(MainActivity.this, "Les dépenses sélectionnées ont été importées dans l'appareil !", Toast.LENGTH_LONG).show();
+                            Toast.makeText(MainActivity.this, "Dépenses sélectionnées supprimées de Dropbox !", Toast.LENGTH_LONG).show();
                         });
                     });
                 } else {
@@ -624,30 +678,187 @@ public class MainActivity extends LoginActivity {
 
             @Override
             public void onError(Exception e) {
-                Log.e(TAG, "Échec du téléchargement depuis Dropbox", e);
+                Log.e(TAG, "Échec de la suppression Dropbox", e);
                 setLoadingState(false);
             }
         }).execute(filesToDownload);
     }
 
-    /**
-     * Met à jour l'adaptateur de la ListView des dépenses locales du téléphone.
-     */
+    private void upload() {
+        List<Expense> selectedExpenses = getCheckedLocalExpenses();
+        if (selectedExpenses.isEmpty() || DropboxClientFactory.getClient() == null) return;
+
+        setLoadingState(true);
+        // Exporte les dépenses sélectionnées sous la forme d'UN SEUL fichier CSV propre pour Excel
+        AppExecutors.getInstance().diskIO().execute(() -> {
+            File csvFile = null;
+            try {
+                csvFile = expenseManager.generateConsolidatedCsvFile(selectedExpenses);
+            } catch (IOException e) {
+                Log.e(TAG, "Erreur création CSV", e);
+            }
+
+            if (csvFile == null) {
+                AppExecutors.getInstance().mainThread().execute(() -> setLoadingState(false));
+                return;
+            }
+
+            final File finalCsvFile = csvFile;
+            List<File> uploadList = new ArrayList<>();
+            uploadList.add(csvFile);
+
+            AppExecutors.getInstance().mainThread().execute(() -> {
+                new UploadFileTask(DropboxClientFactory.getClient(), new Callback() {
+                    @Override
+                    public void onTaskComplete(ArrayList<File> result) {
+                        AppExecutors.getInstance().diskIO().execute(() -> {
+                            // Supprime uniquement les fichiers texte locaux des dépenses sélectionnées
+                            for (Expense expense : selectedExpenses) {
+                                if (expense != null && expense.getFile() != null) {
+                                    ExpenseManager.deleteFileQuietly(expense.getFile());
+                                }
+                            }
+                            ExpenseManager.deleteFileQuietly(finalCsvFile);
+                            AppExecutors.getInstance().mainThread().execute(() -> {
+                                getFilesPhone();
+                                getFilesDrive();
+                                setLoadingState(false);
+                                Toast.makeText(MainActivity.this, "Export CSV envoyé avec succès sur Dropbox !", Toast.LENGTH_LONG).show();
+                            });
+                        });
+                    }
+
+                    @Override
+                    public void onError(Exception e) {
+                        Log.e(TAG, "Échec de l'envoi Dropbox", e);
+                        setLoadingState(false);
+                    }
+                }).execute(uploadList);
+            });
+        });
+    }
+
+    private void download() {
+        List<Expense> selectedExpenses = getCheckedDriveExpenses();
+        if (selectedExpenses.isEmpty() || DropboxClientFactory.getClient() == null) return;
+
+        List<File> filesToDownload = new ArrayList<>();
+        for (Expense e : selectedExpenses) {
+            if (e != null && e.getFile() != null && !filesToDownload.contains(e.getFile())) {
+                filesToDownload.add(e.getFile());
+            }
+        }
+
+        setLoadingState(true);
+        new DownloadFileTask(getApplicationContext(), DropboxClientFactory.getClient(), storagePath, new Callback() {
+            @Override
+            public void onTaskComplete(ArrayList<File> result) {
+                if (result != null) {
+                    AppExecutors.getInstance().diskIO().execute(() -> {
+                        List<Expense> unselectedExpensesToKeep = new ArrayList<>();
+
+                        for (File file : result) {
+                            List<Expense> expensesInFile = Expense.parseAllExpensesFromFile(file);
+                            for (Expense expense : expensesInFile) {
+                                if (isExpenseSelected(expense, selectedExpenses)) {
+                                    try {
+                                        // Crée un fichier texte local individuel pour la dépense SÉLECTIONNÉE
+                                        expenseManager.createExpense(expense.getName(), expense.getAmount(), expense.getCategory());
+                                    } catch (IOException e) {
+                                        Log.e(TAG, "Échec de la création de la dépense importée", e);
+                                    }
+                                } else {
+                                    // Garde la dépense NON sélectionnée pour la conserver sur Dropbox
+                                    unselectedExpensesToKeep.add(expense);
+                                }
+                            }
+                            ExpenseManager.deleteFileQuietly(file);
+                        }
+
+                        // Si certaines dépenses du fichier CSV n'ont PAS été sélectionnées, les ré-exporter sur Dropbox !
+                        if (!unselectedExpensesToKeep.isEmpty()) {
+                            try {
+                                File unselectedCsv = expenseManager.generateConsolidatedCsvFile(unselectedExpensesToKeep);
+                                if (unselectedCsv != null) {
+                                    List<File> toReUpload = new ArrayList<>();
+                                    toReUpload.add(unselectedCsv);
+                                    new UploadFileTask(DropboxClientFactory.getClient(), new Callback() {
+                                        @Override
+                                        public void onTaskComplete(ArrayList<File> res) {
+                                            ExpenseManager.deleteFileQuietly(unselectedCsv);
+                                            AppExecutors.getInstance().mainThread().execute(() -> {
+                                                getFilesPhone();
+                                                getFilesDrive();
+                                                setLoadingState(false);
+                                                Toast.makeText(MainActivity.this, "Dépenses sélectionnées importées !", Toast.LENGTH_LONG).show();
+                                            });
+                                        }
+
+                                        @Override
+                                        public void onError(Exception e) {
+                                            Log.e(TAG, "Échec de la ré-upload", e);
+                                            setLoadingState(false);
+                                        }
+                                    }).execute(toReUpload);
+                                    return;
+                                }
+                            } catch (IOException e) {
+                                Log.e(TAG, "Erreur génération CSV", e);
+                            }
+                        }
+
+                        AppExecutors.getInstance().mainThread().execute(() -> {
+                            getFilesPhone();
+                            getFilesDrive();
+                            setLoadingState(false);
+                            Toast.makeText(MainActivity.this, "Dépenses sélectionnées importées !", Toast.LENGTH_LONG).show();
+                        });
+                    });
+                } else {
+                    setLoadingState(false);
+                }
+            }
+
+            @Override
+            public void onError(Exception e) {
+                Log.e(TAG, "Échec du téléchargement Dropbox", e);
+                setLoadingState(false);
+            }
+        }).execute(filesToDownload);
+    }
+
     public void updateDataPhone() {
-        ArrayAdapter<String> adapterPhone = new ArrayAdapter<>(this, android.R.layout.simple_list_item_multiple_choice, new ArrayList<>(mapFilePhone.values()));
+        List<String> phoneDisplayList = new ArrayList<>();
+        for (Expense expense : localExpenseList) {
+            if (expense != null) {
+                phoneDisplayList.add(expense.getDisplayText());
+            }
+        }
+        ArrayAdapter<String> adapterPhone = new ArrayAdapter<>(this, android.R.layout.simple_list_item_multiple_choice, phoneDisplayList);
         if (listFilePhone != null) {
             listFilePhone.setAdapter(adapterPhone);
+        }
+        double sumLocal = ExpenseManager.calculateTotalAmount(localExpenseList);
+        if (totalLocal != null) {
+            totalLocal.setText(String.format(Locale.FRANCE, "Total : %.2f €", sumLocal));
         }
         updateButtonStates();
     }
 
-    /**
-     * Met à jour l'adaptateur de la ListView des dépenses présentes sur Dropbox.
-     */
     public void updateDataDrive() {
-        ArrayAdapter<String> adapterDrive = new ArrayAdapter<>(this, android.R.layout.simple_list_item_multiple_choice, new ArrayList<>(mapFileDrive.values()));
+        List<String> driveDisplayList = new ArrayList<>();
+        for (Expense expense : driveExpenseList) {
+            if (expense != null) {
+                driveDisplayList.add(expense.getDisplayText());
+            }
+        }
+        ArrayAdapter<String> adapterDrive = new ArrayAdapter<>(this, android.R.layout.simple_list_item_multiple_choice, driveDisplayList);
         if (listFileDrive != null) {
             listFileDrive.setAdapter(adapterDrive);
+        }
+        double sumDrive = ExpenseManager.calculateTotalAmount(driveExpenseList);
+        if (totalDrive != null) {
+            totalDrive.setText(String.format(Locale.FRANCE, "Total : %.2f €", sumDrive));
         }
         updateButtonStates();
     }

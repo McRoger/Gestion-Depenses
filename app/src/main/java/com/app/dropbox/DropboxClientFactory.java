@@ -24,9 +24,10 @@ public class DropboxClientFactory {
     }
 
     public static DbxClientV2 getClient() {
-        if (sDbxClient == null) {
-//            ("Client not initialized.");
-        }
         return sDbxClient;
+    }
+
+    public static void clearClient() {
+        sDbxClient = null;
     }
 }

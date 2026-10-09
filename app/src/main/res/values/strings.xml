@@ -5,5 +5,12 @@
     <string name="sign_in">Sign in</string>
     <string name="creer_depenses">Créer dépenses</string>
 
-
+    <string-array name="categories_array">
+        <item>Loisirs</item>
+        <item>Nourriture / Courses</item>
+        <item>Sport</item>
+        <item>Déplacement</item>
+        <item>Médical</item>
+        <item>Autre</item>
+    </string-array>
 </resources>

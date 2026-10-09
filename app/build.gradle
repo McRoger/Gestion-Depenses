@@ -43,6 +43,7 @@ dependencies {
     implementation 'com.dropbox.core:dropbox-android-sdk:7.0.0'
     api 'com.squareup.okhttp3:okhttp:5.0.0-alpha.10'
     implementation 'com.squareup.picasso:picasso:2.71828'
+    implementation 'androidx.work:work-runtime:2.9.0'
 
 
 }
